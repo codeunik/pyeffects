@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import numpy as np
 
 from .defs import ClipPath, LinearGradient, Mask, RadialGradient
@@ -29,7 +31,7 @@ class Element(Transform, Place):
         self._fill_rule = "nil"
         self._clip_path = "nil"
         self._mask = "nil"
-        self._z_index = 0
+        self._z_index = None
 
         Transform.__init__(self)
 
@@ -40,6 +42,9 @@ class Element(Transform, Place):
                 attr_str += getattr(self, f"_str{attr}")() + " "
 
         return attr_str
+
+    def copy(self):
+        return deepcopy(self)
 
     def z_index(self, z_index):
         self._z_index = z_index
@@ -92,8 +97,7 @@ class Element(Transform, Place):
         return self
 
     def stroke_dasharray(self, stroke_dasharray):
-        border_len = self._border_len()
-        self._stroke_dasharray = np.array(stroke_dasharray) * border_len
+        self._stroke_dasharray = np.array(stroke_dasharray)
         return self
 
     def fill_rule(self, fill_rule):
@@ -105,8 +109,7 @@ class Element(Transform, Place):
         return self
 
     def stroke_dashoffset(self, stroke_dashoffset):
-        border_len = self._border_len()
-        self._stroke_dashoffset = stroke_dashoffset * border_len
+        self._stroke_dashoffset = stroke_dashoffset
         return self
 
     def clip_path(self, clip_path):
@@ -118,7 +121,7 @@ class Element(Transform, Place):
         return self
 
     def get_z_index(self):
-        return self._z_index
+        return 0 if self._z_index is None else self._z_index
 
     def get_stroke(self):
         return self._stroke
@@ -201,7 +204,9 @@ class Element(Transform, Place):
         return f'stroke-linejoin="{self._stroke_linejoin}"'
 
     def _str_stroke_dasharray(self):
-        return f'stroke-dasharray=\"{" ".join(str(x) for x in self._stroke_dasharray)}\"'
+        border_len = self._border_length()
+        stroke_dasharray = self._stroke_dasharray * border_len
+        return f'stroke-dasharray=\"{" ".join(str(x) for x in stroke_dasharray)}\"'
 
     def _str_fill_rule(self):
         return f'fill-rule="{self._fill_rule}"'
@@ -210,7 +215,8 @@ class Element(Transform, Place):
         return f'stroke-miterlimit="{self._stroke_miterlimit}"'
 
     def _str_stroke_dashoffset(self):
-        return f'stroke-dashoffset="{self._stroke_dashoffset}"'
+        border_len = self._border_length()
+        return f'stroke-dashoffset="{self._stroke_dashoffset * border_len}"'
 
     def _str_clip_path(self):
         return f'clip-path="url(#{self._clip_path.id})"'

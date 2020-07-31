@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import numpy as np
 
 from .element import Element
@@ -12,6 +14,9 @@ class Group(list, Place):
     def add(self, *elements):
         for item in Group._flatten(elements):
             self.append(item)
+
+    def copy(self):
+        return deepcopy(self)
 
     @staticmethod
     def _flatten(target):

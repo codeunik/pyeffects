@@ -16,17 +16,21 @@ class Frame:
 
     def __init__(self, width=FrameConfig.width, height=FrameConfig.height):
         self._header = f'''<svg width="{width}" height="{height}" version="1.1" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g transform="matrix(1, 0, 0, -1, 0, 1080)">'''
+        self.groups = dict()
         self.elements = dict()
         self.defs = dict()
 
     def add(self, elements):
         if isinstance(elements, Group):
-            for element in elements:
-                self.elements.setdefault(id(element), element)
+            if self.groups.get(id(elements), True):
+                self.groups.setdefault(id(elements), False)
+                for element in elements:
+                    self.elements.setdefault(id(element), element)
 
-                for _type in self.def_types:
-                    if isinstance(getattr(element, _type), Def):
-                        self.defs.setdefault(getattr(element, _type).id, getattr(element, _type))
+                    for _type in self.def_types:
+                        if isinstance(getattr(element, _type), Def):
+                            self.defs.setdefault(
+                                getattr(element, _type).id, getattr(element, _type))
 
         elif isinstance(elements, Element):
             self.elements.setdefault(id(elements), elements)
@@ -50,7 +54,7 @@ class Frame:
 
             for element in z_indexed_elements:
                 f.write(element._draw())
-                element.dynamic_reset()
+                #element.dynamic_reset()
             f.write("</g></svg>")
 
 

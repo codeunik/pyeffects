@@ -50,17 +50,20 @@ class Camera:
         y = np.array([0.0, 1, 0])
         n = np.cross(Camera._up[:3], y)
         up_angle = math.acos(np.dot(Camera._up[:3], y))
-        focus_angle = math.acos(np.dot(Camera._focus[:3], np.array([0.0, 0, -1])))
+        focus_angle = math.acos(
+            np.dot(Camera._focus[:3], np.array([0.0, 0, -1])))
         return Transform.rotation_matrix(focus_angle, y, zero).dot(
             Transform.rotation_matrix(up_angle, n, zero)).dot(
-                Transform.translation_matrix(*(np.array([0.0, 0, 1]) - Camera._position[:3])))
+                Transform.translation_matrix(*(np.array([0.0, 0, 1]) -
+                                               Camera._position[:3])))
 
     def _camera_view(points):
         camera_transformed_points = Camera._camera_transform().dot(points.T).T
         if camera_transformed_points[:, 2].min() > 0:
             return np.zeros(camera_transformed_points.shape)
         if Camera._is_perspective:
-            np.apply_along_axis(Camera._perspective_transform, 1, camera_transformed_points)
+            np.apply_along_axis(Camera._perspective_transform, 1,
+                                camera_transformed_points)
         return camera_transformed_points
 
     def _perspective_transform(point):

@@ -41,3 +41,7 @@ class Image(Element):
             + np.linalg.norm(vertices[2] - vertices[1])\
             + np.linalg.norm(vertices[3] - vertices[2])\
             + np.linalg.norm(vertices[0] - vertices[3])
+
+    #TODO
+    def bbox(self):
+        pass

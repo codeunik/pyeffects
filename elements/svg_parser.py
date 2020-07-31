@@ -1,3 +1,5 @@
+import math
+import re
 from copy import deepcopy
 
 import bs4
@@ -81,7 +83,7 @@ class SVGParser:
                 element.stroke(element_attrs["stroke"]) \
                     if element_attrs.get("stroke", False) else None
 
-                element.stroke_width(float(element_attrs["stroke-width"])) \
+                element.stroke_width(float(re.findall('\d*\.?\d+',element_attrs["stroke-width"])[0])) \
                     if element_attrs.get("stroke-width", False) else None
 
                 element.fill(element_attrs["fill"]) \
@@ -108,7 +110,7 @@ class SVGParser:
                 element.stroke_dashoffset(float(element_attrs["stroke-dashoffset"])) \
                     if element_attrs.get("stroke-dashoffset", False) else None
 
-                element.fill_rule(float(element_attrs["fill-rule"])) \
+                element.fill_rule(element_attrs["fill-rule"]) \
                     if element_attrs.get("fill-rule", False) else None
 
                 if element_attrs.get("stroke-dasharray", False):
@@ -118,6 +120,14 @@ class SVGParser:
 
                 self.apply_transforms(element, element_attrs["transform"]) \
                     if element_attrs.get("transform", False) else None
+
+                element.matrix(
+                    np.array([
+                        [1, 0, 0, 0],
+                        [0, -1, 0, 1080],
+                        [0, 0, 1, 0],
+                        [0, 0, 0, 1],
+                    ]))
 
                 groups[item] = element
 
@@ -129,29 +139,44 @@ class SVGParser:
         for transform in transforms:
             if "translate" in transform:
                 exec(transform.replace("translate", "x=").replace(" ", ","), d)
-                element.translate(*d['x'])
+                element.translate(*d['x'], 0)
             elif "scale" in transform:
                 exec(transform.replace("scale", "x=").replace(" ", ","), d)
                 if type(d['x']) == tuple:
-                    element.scale(d['x'][0], d['x'][1], 0, 0, True)
+                    element.scale(d['x'][0], d['x'][1], 1, [0, 0, 0], True)
                 else:
-                    element.scale(d['x'], d['x'], 0, 0, True)
+                    element.scale(d['x'], d['x'], 1, [0, 0, 0], True)
             elif "rotate" in transform:
                 exec(transform.replace("rotate", "x=").replace(" ", ","), d)
                 if type(d['x']) == tuple:
-                    element.rotate(d['x'][0], d['x'][1], d['x'][2], True)
+                    element.rotate(d['x'][0], [0, 0, 1],
+                                   [d['x'][1], d['x'][2], 0], True)
                 else:
-                    element.rotate(d['x'], 0, 0, True)
+                    element.rotate(d['x'], [0, 0, 1], [0, 0, 0], True)
             elif "skewX" in transform:
                 exec(transform.replace("skewX", "x=").replace(" ", ","), d)
-                element.skew_x(*d['x'])
+                element.matrix(
+                    np.array([
+                        [1, math.tan((math.pi / 180) * d['x'][0]), 0, 0],
+                        [0, 1, 0, 0],
+                        [0, 0, 1, 0],
+                        [0, 0, 0, 1.0],
+                    ]))
             elif "skewY" in transform:
                 exec(transform.replace("skewY", "x=").replace(" ", ","), d)
-                element.skew_y(*d['x'])
+                element.matrix(
+                    np.array([
+                        [1, 0, 0, 0],
+                        [math.tan((math.pi / 180) * d['x'][0]), 1, 0, 0],
+                        [0, 0, 1, 0],
+                        [0, 0, 0, 1.0],
+                    ]))
             else:
                 exec(transform.replace("matrix", "x=").replace(" ", ","), d)
-                element.apply_matrix(
-                    np.array([[d['x'][0], d['x'][2], d['x'][4]],\
-                              [d['x'][1], d['x'][3], d['x'][5]],\
-                              [0, 0, 1.0]]))
-        element.apply_matrix(np.array([[1, 0, 0], [0, -1, 1080], [0, 0, 1]]))
+                element.matrix(
+                    np.array([
+                        [d['x'][0], d['x'][2], 0, d['x'][4]],
+                        [d['x'][1], d['x'][3], 0, d['x'][5]],
+                        [0, 0, 1.0, 0],
+                        [0, 0, 0, 1.0],
+                    ]))

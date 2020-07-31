@@ -1,4 +1,5 @@
 import math
+import multiprocessing as mp
 import os
 
 from .elements.frame import Frame
@@ -22,20 +23,29 @@ class Renderer:
     def render(self):
         os.system("mkdir -p svgs && mkdir -p bmps && rm -rf svgs/* && rm -rf bmps/*")
         frame_number = 0
+        processes = []
         while frame_number <= self.timeline._lifetime:
+            print(f"{(frame_number/self.timeline._lifetime)*100:.2f}%", end="\r")
             frame = Frame(self.width, self.height)
             self.timeline.exec(frame_number, frame)
-
+            p = mp.Process(target=self.make_frame, args=(frame_number, frame))
+            processes.append(p)
+            p.start()
+            for element in frame.elements.values():
+                element.dynamic_reset()
             if self.bool_preview:
                 self.preview()
 
-            if self.bool_save_frames:
-                frame.save(f"svgs/{frame_number}.svg")
-
             frame_number += 1
+        for p in processes:
+            p.join()
 
         if self.bool_produce_video:
             self._produce_video()
+
+    def make_frame(self, frame_number, frame):
+        if self.bool_save_frames:
+            frame.save(f"svgs/{frame_number}.svg")
 
     def preview(self):
         pass
@@ -43,7 +53,7 @@ class Renderer:
     def _produce_video(self):
         os.system(
             f"cd svgs/ &&"
-            " DRI_PRIME=1 ffmpeg"\
+            " DRI_PRIME=1 /usr/local/bin/ffmpeg"\
             f" -r {self.timeline.fps}"\
             f" -s {self.width}x{self.height}"\
             " -f image2"\

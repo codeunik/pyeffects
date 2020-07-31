@@ -27,6 +27,10 @@ class Path(Element):
         Element.__init__(self)
 
     def set_segments(self, data):
+        self._data_3d = []
+        self._index_map = dict()
+        self._transformed_points = None
+        self._vertex_avg = None
         if type(data) == str:
             self._data_2d = SVGPath(*_replace_by_beziers(parse_path(data)))
         elif type(data) == SVGPath:
@@ -35,40 +39,60 @@ class Path(Element):
             self._data_2d = SVGPath(*data)
 
         self._convert_2d_to_3d()
-        self._bbox = np.array([
-            [self._data_3d[:, 0].min(), self._data_3d[:, 1].min(), self._data_3d[:, 2].min(), 1],\
-            [self._data_3d[:, 0].max(), self._data_3d[:, 1].max(), self._data_3d[:, 2].max(), 1],\
-        ])
+        self._create_bbox()
+        return self
 
     def has_shading(self, has_shading):
         self._has_shading = has_shading
+        return self
 
     def get_z_index(self):
         self._get_vertex_avg()
-        return self._vertex_avg[2]
+        if self._z_index is None:
+            return self._vertex_avg[2]
+        else:
+            return self._z_index
+
+    def _create_bbox(self):
+        x_min = self._data_3d[:-1, 0].min()
+        y_min = self._data_3d[:-1, 1].min()
+        z_min = self._data_3d[:-1, 2].min()
+        x_max = self._data_3d[:-1, 0].max()
+        y_max = self._data_3d[:-1, 1].max()
+        z_max = self._data_3d[:-1, 2].max()
+        self._bbox = np.array([
+            [x_min, y_min, z_min, 1.0],  # 0, 0, 0
+            [x_min, y_min, z_max, 1.0],  # 0, 0, 1
+            [x_min, y_max, z_min, 1.0],  # 0, 1, 0
+            [x_min, y_max, z_max, 1.0],  # 0, 1, 1
+            [x_max, y_min, z_min, 1.0],  # 1, 0, 0
+            [x_max, y_min, z_max, 1.0],  # 1, 0, 1
+            [x_max, y_max, z_min, 1.0],  # 1, 1, 0
+            [x_max, y_max, z_max, 1.0],  # 1, 1, 1
+        ])
 
     def _get_transformed_points(self):
-        if self._transformed_points is None:
-            self._transformed_points = self.transform_3d().dot(self._data_3d.T).T
+        self._transformed_points = self.transform_3d().dot(self._data_3d.T).T
 
     def _get_vertex_avg(self):
-        if self._vertex_avg is None:
-            self._get_transformed_points()
-            self._vertex_avg = sum(
-                self._transformed_points[:-1]) / (len(self._transformed_points) - 1)
+        self._get_transformed_points()
+        self._vertex_avg = sum(self._transformed_points[:-1]) / (
+            len(self._transformed_points) - 1)
 
     def _border_length(self):
-        self._get_transformed_points()
-        return self._data_2d
+        self._convert_3d_to_2d()
+        return self._data_2d.length()
 
     def _str_fill(self):
         if self._has_shading:
             if isinstance(self._fill, np.ndarray):
                 self._get_vertex_avg()
-                face_to_light = unit_vector(Light.get_position() - self._vertex_avg)
+                face_to_light = unit_vector(Light.get_position() -
+                                            self._vertex_avg)
                 face_normal = unit_vector(self._transformed_points[-1])
                 ambient_coeff = 0.33
-                diffuse_coeff = 0.67 * (abs(face_normal[:3].dot(face_to_light[:3])))
+                diffuse_coeff = 0.67 * (abs(face_normal[:3].dot(
+                    face_to_light[:3])))
                 color = self._fill * (ambient_coeff + diffuse_coeff)
                 return f'fill="rgb{tuple(color)}"'
         if isinstance(self._fill, LinearGradient):
@@ -82,8 +106,6 @@ class Path(Element):
         s = f'<path d="{self._data_2d.d()}" '
         s += super()._draw()
         s += "></path>"
-        self._vertex_avg = None
-        self._transformed_points = None
         return s
 
     def _convert_2d_to_3d(self):
@@ -113,9 +135,12 @@ class Path(Element):
         def v2c(v):
             return complex(round(v[0], 1), round(v[1], 1))
 
-        camera_transformed_points = Camera._camera_view(self._transformed_points)
+        self._get_transformed_points()
+        camera_transformed_points = Camera._camera_view(
+            self._transformed_points)
         for comp_index, point_index in self._index_map:
-            p = v2c(camera_transformed_points[self._index_map[(comp_index, point_index)]])
+            p = v2c(camera_transformed_points[self._index_map[(comp_index,
+                                                               point_index)]])
             if point_index == 0:
                 self._data_2d[comp_index].start = p
             if len(self._data_2d[comp_index]) == 2:
@@ -128,6 +153,30 @@ class Path(Element):
                     self._data_2d[comp_index].control2 = p
                 elif point_index == 3:
                     self._data_2d[comp_index].end = p
+
+    def _apply_static_transform(self):
+        def v2c(v):
+            return complex(v[0], v[1])
+
+        self._data_3d = self.static.dot(self._data_3d.T).T
+        for comp_index, point_index in self._index_map:
+            p = v2c(self._data_3d[self._index_map[(comp_index, point_index)]])
+            if point_index == 0:
+                self._data_2d[comp_index].start = p
+            if len(self._data_2d[comp_index]) == 2:
+                if point_index == 1:
+                    self._data_2d[comp_index].end = p
+            else:
+                if point_index == 1:
+                    self._data_2d[comp_index].control1 = p
+                elif point_index == 2:
+                    self._data_2d[comp_index].control2 = p
+                elif point_index == 3:
+                    self._data_2d[comp_index].end = p
+
+        self._create_bbox()
+        self.static = np.eye(4, dtype=np.float)
+        return self
 
     # def _format_path_3d(self, data_3d):
     #     temp_map = dict()
@@ -170,7 +219,7 @@ class Path(Element):
     #                 matrix.dot(self._c2v(self[i].control1)))
     #             self[i].control2 = self._v2c(
     #                 matrix.dot(self._c2v(self[i].control2)))
-    #     self._bbox = matrix.dot(self._bbox.T).T
+    #     self._create_bbox = matrix.dot(self._create_bbox.T).T
     #     self.dynamic_reset()
     #     self.reset()
     #     return self

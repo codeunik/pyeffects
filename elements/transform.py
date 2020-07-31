@@ -33,15 +33,21 @@ class Transform:
     def scale(self, sx=1, sy=1, sz=1, anchor=[0.5, 0.5, 0.5], abs=False):
         anchor = np.array([*anchor, 1])
         abs_anchor = self.anchor(self, anchor, abs)
-        self.static = Transform.scale_matrix(sx, sy, sz, abs_anchor[:3]).dot(self.static)
+        self.static = Transform.scale_matrix(sx, sy, sz,
+                                             abs_anchor[:3]).dot(self.static)
         return self
 
-    def rotate(self, angle=0, axis=[0, 0, 1], anchor=[0.5, 0.5, 0.5], abs=False):
+    def rotate(self,
+               angle=0,
+               axis=[0, 0, 1],
+               anchor=[0.5, 0.5, 0.5],
+               abs=False):
         anchor = np.array([*anchor, 1])
         abs_anchor = self.anchor(self, anchor, abs)
         axis = np.array(axis)
         axis = axis / np.linalg.norm(axis)
-        self.static = Transform.rotation_matrix(angle, axis, abs_anchor[:3]).dot(self.static)
+        self.static = Transform.rotation_matrix(
+            angle, axis, abs_anchor[:3]).dot(self.static)
         return self
 
     def matrix(self, mat):
@@ -56,18 +62,29 @@ class Transform:
         self.dynamic = Transform.translation_matrix(x, y, z).dot(self.dynamic)
         return self
 
-    def dynamic_scale(self, sx=1, sy=1, sz=1, anchor=[0.5, 0.5, 0.5]):
+    def dynamic_scale(self,
+                      sx=1,
+                      sy=1,
+                      sz=1,
+                      anchor=[0.5, 0.5, 0.5],
+                      abs=False):
         anchor = np.array([*anchor, 1])
         abs_anchor = self.anchor(self, anchor, abs)
-        self.dynamic = Transform.scale_matrix(sx, sy, sz, abs_anchor[:3]).dot(self.dynamic)
+        self.dynamic = Transform.scale_matrix(sx, sy, sz,
+                                              abs_anchor[:3]).dot(self.dynamic)
         return self
 
-    def dynamic_rotate(self, angle=0, axis=[0, 0, 1], anchor=[0.5, 0.5, 0.5], abs=False):
+    def dynamic_rotate(self,
+                       angle=0,
+                       axis=[0, 0, 1],
+                       anchor=[0.5, 0.5, 0.5],
+                       abs=False):
         anchor = np.array([*anchor, 1])
         abs_anchor = self.anchor(self, anchor, abs)
         axis = np.array(axis)
         axis = axis / np.linalg.norm(axis)
-        self.dynamic = Transform.rotation_matrix(angle, axis, abs_anchor[:3]).dot(self.dynamic)
+        self.dynamic = Transform.rotation_matrix(
+            angle, axis, abs_anchor[:3]).dot(self.dynamic)
         return self
 
     def dynamic_matrix(self, mat):
@@ -75,7 +92,15 @@ class Transform:
         return self
 
     def bbox(self):
-        return self.transform_3d().dot(self._bbox.T).T
+        bbox = self.transform_3d().dot(self._bbox.T).T
+        x_min = bbox[:, 0].min()
+        y_min = bbox[:, 1].min()
+        z_min = bbox[:, 2].min()
+        x_max = bbox[:, 0].max()
+        y_max = bbox[:, 1].max()
+        z_max = bbox[:, 2].max()
+        return np.array([[x_min, y_min, z_min, 1.0],
+                         [x_max, y_max, z_max, 1.0]])
 
     def center(self):
         return self.bbox().sum(axis=0) / 2
@@ -110,8 +135,17 @@ class Transform:
         qw = cos_half_angle
         return Transform.translation_matrix(*anchor).dot(
             np.array([
-                [1 - 2 * (qy**2 + qz**2), 2 * (qx * qy - qw * qz), 2 * (qx * qz + qw * qy), 0],
-                [2 * (qx * qy + qw * qz), 1 - 2 * (qx**2 + qz**2), 2 * (qy * qz - qw * qx), 0],
-                [2 * (qx * qz - qw * qy), 2 * (qy * qz + qw * qx), 1 - 2 * (qx**2 + qy**2), 0],
+                [
+                    1 - 2 * (qy**2 + qz**2), 2 * (qx * qy - qw * qz),
+                    2 * (qx * qz + qw * qy), 0
+                ],
+                [
+                    2 * (qx * qy + qw * qz), 1 - 2 * (qx**2 + qz**2),
+                    2 * (qy * qz - qw * qx), 0
+                ],
+                [
+                    2 * (qx * qz - qw * qy), 2 * (qy * qz + qw * qx),
+                    1 - 2 * (qx**2 + qy**2), 0
+                ],
                 [0, 0, 0, 1],
             ])).dot(Transform.translation_matrix(*-anchor))
