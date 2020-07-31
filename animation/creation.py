@@ -29,13 +29,12 @@ class draw_and_then_fill(Animation):
 class write(Animation):
     def __init__(self):
         super().__init__()
-        self.duration = None
+        self.duration = 1
 
     def animation(self):
         self.timeline.set([(self.elements.fill_opacity, 0)])
         total_elements = len(self.elements) if isinstance(self.elements, Group) else 1
-        self.duration = total_elements * 0.2
-        duration = 2 / (total_elements + 3)
+        duration = (2 * self.duration) / (total_elements + 3)
         stagger = duration / 2
         if total_elements > 1:
             t1 = self.timeline.time()

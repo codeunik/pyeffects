@@ -1,9 +1,9 @@
 import numpy as np
 
+from ..dynamic_data import DynamicDataIdentifier
 from ..elements.element import Element
 from ..elements.group import Group
 from ..elements.utils import Color
-from ..meta import DynamicDataIdentifier
 
 
 class Tween:

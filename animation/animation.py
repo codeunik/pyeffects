@@ -1,6 +1,6 @@
 import numpy as np
 
-from ..meta import DynamicDataIdentifier, d
+from ..dynamic_data import DynamicDataIdentifier, d
 from ..timeline import Timeline
 from ..tween import *
 

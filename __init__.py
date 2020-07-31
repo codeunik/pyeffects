@@ -6,8 +6,8 @@ __license__ = "MIT"
 import warnings
 
 from .animation import *
+from .dynamic_data import *
 from .elements import *
-from .meta import *
 from .render import Renderer
 from .timeline import Timeline
 from .tween import *

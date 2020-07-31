@@ -2,8 +2,8 @@ import math
 from copy import deepcopy
 from uuid import uuid4
 
+from .dynamic_data import DynamicDataIdentifier, d
 from .elements import Camera, Group
-from .meta import DynamicDataIdentifier, d
 from .tween import Tween, ease, translate
 
 
