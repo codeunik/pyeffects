@@ -7,7 +7,7 @@ from ..tween import *
 
 class Animation:
     def __init__(self):
-        self.duration = None
+        self.duration = 1
         self.flag = 1
 
     def set_elements(self, elements):

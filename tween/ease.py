@@ -122,7 +122,7 @@ def slow_into(t):
 # in_out: A tween function that accelerates, reaches the midpoint, and then decelerates.
 
 
-class Ease:
+class _Ease:
     def __init__(self):
         self._power = 1
 
@@ -134,17 +134,17 @@ class Ease:
         pass
 
 
-class EaseIn(Ease):
+class _EaseIn(_Ease):
     def rate(self, t):
         return t**self._power
 
 
-class EaseOut(Ease):
+class _EaseOut(_Ease):
     def rate(self, t):
         return 1 - (1 - t)**self._power
 
 
-class EaseInOut(Ease):
+class _EaseInOut(_Ease):
     def rate(self, t):
         if t < 0.5:
             return (2 * t)**self._power / 2
@@ -152,9 +152,9 @@ class EaseInOut(Ease):
             return 1 - ((2 - 2 * t)**self._power) / 2
 
 
-ease_in = EaseIn().config(2)
-ease_out = EaseOut().config(2)
-ease_in_out = EaseInOut().config(2)
+ease_in = _EaseIn().config(2)
+ease_out = _EaseOut().config(2)
+ease_in_out = _EaseInOut().config(2)
 
 
 def ease_in_sine(t):

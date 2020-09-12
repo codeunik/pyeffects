@@ -104,6 +104,8 @@ class Timeline:
 
     def exec(self, t, frame):
         index = 0
+        for element in Timeline.frame_elements.values():
+            frame.add(element)
         while self._actions.get_action(index):
             action_scheduler, action = self._actions.get_action(index)
             is_time = action_scheduler.is_time(t)
@@ -115,6 +117,7 @@ class Timeline:
                             frame.add(element)
                     else:
                         for element in frame_elements:
+                            frame.add(element)
                             Timeline.frame_elements.setdefault(id(element), element)
                 elif isinstance(action, Timeline):
                     rel_time = action_scheduler.rel_time(t)
@@ -127,8 +130,6 @@ class Timeline:
                     continue
 
             index += 1
-        for element in Timeline.frame_elements.values():
-            frame.add(element)
 
         if t == self._lifetime:
             self._actions.clear()
@@ -138,9 +139,9 @@ class Timeline:
 
     def add_animation(self,
                       elements,
-                      anims=[Tween()],
-                      duration=None,
+                      anims,
                       delay=1,
+                      duration=None,
                       label=None,
                       start=None,
                       end=None,
@@ -163,8 +164,6 @@ class Timeline:
                 anim.set_timeline(self)
                 if duration is not None:
                     anim.set_duration(duration)
-                elif anim.get_duration() is None:
-                    anim.set_duration(duration)
                 anim.exec(start)
         return self
 
@@ -177,25 +176,27 @@ class Timeline:
     def stagger(self,
                 elements,
                 anims=[Tween()],
+                delay=1,
                 duration=0.5,
                 stagger=0.1,
-                delay=1,
                 label=None,
                 start=None,
                 end=None,
-                ease=None):
-        assert isinstance(elements, Group)
-        for i in range(len(elements)):
-            if i == 1:
-                delay = stagger - duration
-            self.add_animation(elements[i], deepcopy(anims), duration, delay, label, start, end,
-                               ease)
+                ease=ease.smooth):
+        if isinstance(elements, Group):
+            for i in range(len(elements)):
+                if i == 1:
+                    delay = stagger - duration
+                self.add_animation(elements[i], deepcopy(anims), delay, duration, label, start, end,
+                                   ease)
+        else:
+            self.add_animation(elements, anims, delay, duration, label, start, end, ease)
 
     def time(self):
         return self._cursor / self.fps
 
-    def camera(self, anims, duration=1, delay=0, label=None, start=None, end=None, ease=None):
-        return self.add_animation(Camera, anims, duration, delay, label, start, end, ease)
+    def camera(self, anims, delay=0, duration=1, label=None, start=None, end=None, ease=None):
+        return self.add_animation(Camera, anims, delay, duration, label, start, end, ease)
 
     def lifetime(self, t):
         self._lifetime = t

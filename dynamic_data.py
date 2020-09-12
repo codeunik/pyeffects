@@ -1,9 +1,24 @@
 class DynamicDataIdentifier:
-    def __init__(self, name):
+    def __init__(self, dynamic_data, name):
+        self.dynamic_data = dynamic_data
         self.name = name
+        self.index = None
 
     def get(self):
-        return d.get(self.name)
+        if type(self.index) == int:
+            return self.dynamic_data.get(self.name)[self.index]
+        else:
+            return self.dynamic_data.get(self.name)
+
+    def __getitem__(self, key):
+        self.index = key
+        return self
+
+    def __setitem__(self, key, value):
+        self.dynamic_data.__dict__[self.name][key] = value
+
+    def __delitem__(self, key):
+        del self.dynamic_data[self.name][key]
 
 
 class DynamicData:
@@ -15,12 +30,14 @@ class DynamicData:
 
     def __getattribute__(self, name):
         if name in DynamicData.names:
-            return DynamicDataIdentifier(name)
+            DynamicData.temp = DynamicDataIdentifier(self, name)
+            return DynamicData.temp
         else:
             return super(DynamicData, self).__getattribute__(name)
 
     def __getattr__(self, name):
-        return DynamicDataIdentifier(name)
+        DynamicData.temp = DynamicDataIdentifier(self, name)
+        return DynamicData.temp
 
     def get(self, name):
         return self.__dict__[name]

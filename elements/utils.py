@@ -1,14 +1,11 @@
 import numpy as np
 
-FONT_INCONSOLATA = "Inconsolata"
-
 
 class Color:
     @staticmethod
     def hex(color):
         if len(color) == 7:
-            return np.array([int(color[i:i + 2], 16) for i in (1, 3, 5)],
-                            dtype=np.int)
+            return np.array([int(color[i:i + 2], 16) for i in (1, 3, 5)], dtype=np.int)
         else:
             return np.array([int(c * 2, 16) for c in color[1:]], dtype=np.int)
 

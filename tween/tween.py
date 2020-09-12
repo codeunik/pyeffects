@@ -14,8 +14,7 @@ class Tween:
 
         self.start_frame = 0
         self.end_frame = -1
-        self.motion_duration = -1
-        self.flag = 1
+        self.dynamic_data_flag = 1
 
     def set_elements(self, elements):
         self.elements = elements
@@ -24,11 +23,11 @@ class Tween:
         self.ease = ease
 
     def exec(self, frame_number):
-        if self.flag:
+        if self.dynamic_data_flag:
             for var in dir(self):
                 if isinstance(getattr(self, var), DynamicDataIdentifier):
                     setattr(self, var, getattr(self, var).get())
-            self.flag = 0
+            self.dynamic_data_flag = 0
         t = self.progress(frame_number)
         if self.on_update:
             self.on_update(*self.on_update_kwargs, t=t)
@@ -44,12 +43,11 @@ class Tween:
         elif frame_number == self.end_frame:
             return 1
         else:
-            return (frame_number - self.start_frame) / self.motion_duration
+            return (frame_number - self.start_frame) / (self.end_frame - self.start_frame)
 
     def timing(self, start_frame, end_frame):
         self.start_frame = start_frame
         self.end_frame = end_frame
-        self.motion_duration = end_frame - start_frame
 
 
 class translate(Tween):

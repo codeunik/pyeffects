@@ -14,6 +14,10 @@ class TexConfig:
     mono_font = None
     sans_font = None
     margin = 5.5
+    scale_factor = 8
+    fill = [255, 255, 255]
+    stroke = [255, 255, 255]
+    stroke_width = 1
 
 
 def use_fonts():
@@ -70,15 +74,6 @@ def Tex(expr):
         r.matrix(np.array([[1, 0, 0, x], [0, -1, 0, -y], [0, 0, 1, 0], [0, 0, 0, 1.0]]))
         chars.append(r)
 
-    # if merge:
-    #     tex = Path("")
-    #     for char in chars:
-    #         tex.append(char.path)
-    #     tex.place_at_pos(0, 0)
-    #     tex.update(stroke_width=stroke_width)
-    #     tex.scale(scale)
-    #     return tex
-    # else:
-    chars.fill([255, 255, 255]).stroke([255, 255, 255]).stroke_width(1)
-    chars.scale(8, 8)
+    chars.fill(TexConfig.fill).stroke(TexConfig.stroke).stroke_width(TexConfig.stroke_width)
+    chars.scale(TexConfig.scale_factor, TexConfig.scale_factor)
     return chars

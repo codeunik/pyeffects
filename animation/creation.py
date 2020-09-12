@@ -2,57 +2,59 @@ from .animation import *
 
 
 class draw_and_then_fill(Animation):
-    def __init__(self):
+    def __init__(self, element_duration=0.25):
         super().__init__()
-        self.duration = 2
+        self.element_duration = element_duration
 
     def animation(self):
-        self.timeline.set([(self.elements.fill_opacity, 0)])
         total_elements = len(self.elements) if isinstance(self.elements, Group) else 1
-        if total_elements > 1:
-            stagger = self.duration / (4 * (total_elements - 1))
-            t1 = self.timeline.time()
-            self.timeline.stagger(self.elements, [draw([0, 1], [1, 0])],
-                                  self.duration / 4,
-                                  stagger,
-                                  0,
-                                  ease=self.ease)
-            self.timeline.add_animation(self.elements, [fill_opacity(1)],
-                                        self.duration / 2,
-                                        0,
-                                        ease=self.ease)
-        else:
-            self.timeline.add_animation(
-                self.elements, [draw([0, 1], [1, 0]), fill_opacity(1)], self.duration, 0)
+        self.duration = (total_elements * self.element_duration) / (1 + 0.075 * total_elements)
+        self.timeline.set([(self.elements.fill_opacity, 0)])
+        stagger = self.duration / (4 * (total_elements - 1))
+        t1 = self.timeline.time()
+        self.timeline.stagger(self.elements, [draw([0, 1], [1, 0])],
+                              0,
+                              self.duration / 4,
+                              stagger,
+                              ease=self.ease)
+        self.timeline.add_animation(self.elements, [fill_opacity(1)],
+                                    0,
+                                    self.duration / 2,
+                                    ease=self.ease)
 
 
 class write(Animation):
-    def __init__(self):
+    def __init__(self, element_duration=0.25):
         super().__init__()
-        self.duration = 1
+        self.element_duration = element_duration
 
     def animation(self):
-        self.timeline.set([(self.elements.fill_opacity, 0)])
         total_elements = len(self.elements) if isinstance(self.elements, Group) else 1
-        duration = (2 * self.duration) / (total_elements + 3)
-        stagger = duration / 2
-        if total_elements > 1:
-            t1 = self.timeline.time()
-            self.timeline.stagger(self.elements, [draw([0, 1], [1, 0])],
-                                  duration,
-                                  stagger,
-                                  0,
-                                  ease=self.ease)
-            t2 = self.timeline.time()
+        self.duration = (total_elements * self.element_duration) / (1 + 0.075 * total_elements)
+        element_duration = 3 * self.duration / (total_elements + 8)
+        self.timeline.set([(self.elements.fill_opacity, 0), (self.elements.stroke_opacity, 1)])
+        stagger = element_duration / 3
 
-            self.timeline.stagger(self.elements, [fill_opacity(1)],
-                                  duration,
-                                  stagger,
-                                  t1 - t2 + duration,
-                                  ease=self.ease)
-        else:
-            self.timeline.add_animation(
-                self.elements, [draw([0, 1], [1, 0]), fill_opacity(1)], self.duration)
+        t1 = self.timeline.time()
+        self.timeline.stagger(self.elements, [draw([0, 1], [1, 0])],
+                              0,
+                              element_duration,
+                              stagger,
+                              ease=self.ease)
+        t2 = self.timeline.time()
+
+        self.timeline.stagger(self.elements, [fill_opacity(1)],
+                              t1 - t2 + element_duration,
+                              element_duration,
+                              stagger,
+                              ease=self.ease)
+        t3 = self.timeline.time()
+
+        self.timeline.stagger(self.elements, [stroke_opacity(0)],
+                              t1 - t3 + 2 * element_duration,
+                              element_duration,
+                              stagger,
+                              ease=self.ease)
 
 
 class grow(Animation):
@@ -80,8 +82,8 @@ class grow(Animation):
         self.timeline.add_animation(
             self.elements, [translate(d.x, d.y, d.z),
                             scale(1000, 1000, 1000, self.anchor)],
-            self.duration,
             0,
+            self.duration,
             ease=self.ease)
 
 
@@ -107,8 +109,8 @@ class shrink(Animation):
         self.timeline.add_animation(
             self.elements, [translate(d.x, d.y, d.z),
                             scale(0.0001, 0.0001, 0.0001, self.anchor)],
-            self.duration,
             0,
+            self.duration,
             ease=self.ease)
 
 
@@ -156,8 +158,8 @@ class fade_in(Animation):
             opacity(1),
             scale(1 / self.from_scale, 1 / self.from_scale, 1 / self.from_scale)
         ],
-                                    self.duration,
                                     0,
+                                    self.duration,
                                     ease=self.ease)
 
 
@@ -200,6 +202,6 @@ class fade_out(Animation):
             opacity(0),
             scale(self.to_scale, self.to_scale, self.to_scale)
         ],
-                                    self.duration,
                                     0,
+                                    self.duration,
                                     ease=self.ease)

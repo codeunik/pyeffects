@@ -14,8 +14,8 @@ class focus(Animation):
         indicator = Circle(center[0], center[1], 1).fill(self.color).opacity(self.opacity)
         self.timeline.set([(indicator.scale, (1000, 1000, 1000))])
         self.timeline.add_animation(indicator, [scale(0.001, 0.001, 0.001)],
-                                    self.duration,
                                     0,
+                                    self.duration,
                                     ease=self.ease)
         self.timeline.remove(indicator)
 
@@ -32,8 +32,8 @@ class indicate(Animation):
             [scale(self.scale, self.scale, self.scale),
              fill(self.color),
              stroke(self.color)],
-            self.duration,
             0,
+            self.duration,
             ease=ease.there_and_back)
 
 
@@ -53,7 +53,7 @@ class rect_flash(Animation):
             self.color).stroke_width(3).stroke_dasharray(
                 [self.visible_length_ratio, 1]).stroke_dashoffset(self.visible_length_ratio)
         self.timeline.add_animation(rect_indicator, [stroke_dashoffset(-1)],
-                                    self.duration,
                                     0,
+                                    self.duration,
                                     ease=self.ease)
         self.timeline.remove(rect_indicator)

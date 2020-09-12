@@ -3,7 +3,7 @@ from copy import deepcopy
 import numpy as np
 
 from ._component_manipulation import (_replace_by_beziers, _split_bezier,
-                                      _update_comp_len_list)
+                                      _split_seg)
 from .camera import Camera
 from .defs import LinearGradient, RadialGradient
 from .element import Element
@@ -31,12 +31,36 @@ class Path(Element):
         self._index_map = dict()
         self._transformed_points = None
         self._vertex_avg = None
-        if type(data) == str:
-            self._data_2d = SVGPath(*_replace_by_beziers(parse_path(data)))
-        elif type(data) == SVGPath:
-            self._data_2d = SVGPath(*_replace_by_beziers(data))
+        self._data_2d = self._get_svg_path(data)
+        self._convert_2d_to_3d()
+        self._create_bbox()
+        return self
+
+    def add_segments(self, data, index=None):
+        data = self._get_svg_path(data)
+        if index:
+            for comp in reversed(data):
+                self._data_2d.insert(index, comp)
         else:
-            self._data_2d = SVGPath(*data)
+            self._data_2d.extend(data)
+
+        self._convert_2d_to_3d()
+        self._create_bbox()
+        return self
+
+    def remove_segments(self, indices=[-1]):
+        for i in indices:
+            self._data_2d.pop(i)
+
+        self._convert_2d_to_3d()
+        self._create_bbox()
+        return self
+
+    def modify_segments(self, indicies, modified_segments):
+        assert len(indicies) == len(modified_segments)
+        for i in range(len(indicies)):
+            self._data_2d.pop(indicies[i])
+            self._data_2d.insert(indicies[i], modified_segments[i])
 
         self._convert_2d_to_3d()
         self._create_bbox()
@@ -53,6 +77,36 @@ class Path(Element):
         else:
             return self._z_index
 
+    def union(self, path):
+        union_path = SVGPath()
+        this_path_copy = deepcopy(self._data_2d)
+        other_path_copy = deepcopy(path._data_2d)
+        Path._partial_union_path(0, this_path_copy, path._data_2d, union_path)
+        Path._partial_union_path(0, other_path_copy, self._data_2d, union_path)
+        Path._path_joiner(union_path, 0)
+        self.set_segments(union_path)
+        return self
+
+    def intersection(self, path):
+        intersection_path = SVGPath()
+        this_path_copy = deepcopy(self._data_2d)
+        other_path_copy = deepcopy(path._data_2d)
+        Path._partial_intersection_path(0, this_path_copy, path._data_2d, intersection_path)
+        Path._partial_intersection_path(0, other_path_copy, self._data_2d, intersection_path)
+        Path._path_joiner(intersection_path, 0)
+        self.set_segments(intersection_path)
+        return self
+
+    def difference(self, path):
+        difference_path = SVGPath()
+        this_path_copy = deepcopy(self._data_2d)
+        other_path_copy = deepcopy(path._data_2d)
+        Path._partial_union_path(0, this_path_copy, path._data_2d, difference_path)
+        Path._partial_intersection_path(0, other_path_copy, self._data_2d, difference_path)
+        Path._path_joiner(difference_path, 0)
+        self.set_segments(difference_path)
+        return self
+
     def _create_bbox(self):
         x_min = self._data_3d[:-1, 0].min()
         y_min = self._data_3d[:-1, 1].min()
@@ -61,14 +115,14 @@ class Path(Element):
         y_max = self._data_3d[:-1, 1].max()
         z_max = self._data_3d[:-1, 2].max()
         self._bbox = np.array([
-            [x_min, y_min, z_min, 1.0],  # 0, 0, 0
-            [x_min, y_min, z_max, 1.0],  # 0, 0, 1
-            [x_min, y_max, z_min, 1.0],  # 0, 1, 0
-            [x_min, y_max, z_max, 1.0],  # 0, 1, 1
-            [x_max, y_min, z_min, 1.0],  # 1, 0, 0
-            [x_max, y_min, z_max, 1.0],  # 1, 0, 1
-            [x_max, y_max, z_min, 1.0],  # 1, 1, 0
-            [x_max, y_max, z_max, 1.0],  # 1, 1, 1
+            [x_min, y_min, z_min, 1.0],    # 0, 0, 0
+            [x_min, y_min, z_max, 1.0],    # 0, 0, 1
+            [x_min, y_max, z_min, 1.0],    # 0, 1, 0
+            [x_min, y_max, z_max, 1.0],    # 0, 1, 1
+            [x_max, y_min, z_min, 1.0],    # 1, 0, 0
+            [x_max, y_min, z_max, 1.0],    # 1, 0, 1
+            [x_max, y_max, z_min, 1.0],    # 1, 1, 0
+            [x_max, y_max, z_max, 1.0],    # 1, 1, 1
         ])
 
     def _get_transformed_points(self):
@@ -76,8 +130,7 @@ class Path(Element):
 
     def _get_vertex_avg(self):
         self._get_transformed_points()
-        self._vertex_avg = sum(self._transformed_points[:-1]) / (
-            len(self._transformed_points) - 1)
+        self._vertex_avg = sum(self._transformed_points[:-1]) / (len(self._transformed_points) - 1)
 
     def _border_length(self):
         self._convert_3d_to_2d()
@@ -87,12 +140,10 @@ class Path(Element):
         if self._has_shading:
             if isinstance(self._fill, np.ndarray):
                 self._get_vertex_avg()
-                face_to_light = unit_vector(Light.get_position() -
-                                            self._vertex_avg)
+                face_to_light = unit_vector(Light.get_position() - self._vertex_avg)
                 face_normal = unit_vector(self._transformed_points[-1])
                 ambient_coeff = 0.33
-                diffuse_coeff = 0.67 * (abs(face_normal[:3].dot(
-                    face_to_light[:3])))
+                diffuse_coeff = 0.67 * (abs(face_normal[:3].dot(face_to_light[:3])))
                 color = self._fill * (ambient_coeff + diffuse_coeff)
                 return f'fill="rgb{tuple(color)}"'
         if isinstance(self._fill, LinearGradient):
@@ -133,14 +184,12 @@ class Path(Element):
 
     def _convert_3d_to_2d(self):
         def v2c(v):
-            return complex(round(v[0], 1), round(v[1], 1))
+            return complex(int(round(v[0], 0)), int(round(v[1], 0)))
 
         self._get_transformed_points()
-        camera_transformed_points = Camera._camera_view(
-            self._transformed_points)
+        camera_transformed_points = Camera._camera_view(self._transformed_points)
         for comp_index, point_index in self._index_map:
-            p = v2c(camera_transformed_points[self._index_map[(comp_index,
-                                                               point_index)]])
+            p = v2c(camera_transformed_points[self._index_map[(comp_index, point_index)]])
             if point_index == 0:
                 self._data_2d[comp_index].start = p
             if len(self._data_2d[comp_index]) == 2:
@@ -177,6 +226,81 @@ class Path(Element):
         self._create_bbox()
         self.static = np.eye(4, dtype=np.float)
         return self
+
+    def _get_svg_path(self, data):
+        if type(data) == str:
+            data = SVGPath(*_replace_by_beziers(parse_path(data)))
+        elif type(data) == SVGPath:
+            data = SVGPath(*_replace_by_beziers(data))
+        else:
+            data = SVGPath(*data)
+        return data
+
+    @staticmethod
+    def _path_joiner(path, index):
+        if index != len(path):
+            for i in range(index + 1, len(path)):
+                if abs(path[index].end - path[i].start) < 0.01:
+                    path.insert(index + 1, path.pop(i))
+                    break
+                if abs(path[index].end - path[i].end) < 0.01:
+                    temp = path[i].start
+                    path[i].start = path[i].end
+                    path[i].end = temp
+                    if isinstance(path[i], CubicBezier):
+                        temp = path[i].control1
+                        path[i].control1 = path[i].control2
+                        path[i].control2 = temp
+                    path.insert(index + 1, path.pop(i))
+                    break
+
+            Path._path_joiner(path, index + 1)
+
+    @staticmethod
+    def _partial_union_path(index, this_path, other_path, union_path):
+        if index != len(this_path):
+            intersections = SVGPath(this_path[index]).intersect(other_path)
+            for i in reversed(range(len(intersections))):
+                if not 0.0001 < intersections[i][0][2] < 0.9999:
+                    intersections.pop(i)
+
+            if intersections:
+                this_t = intersections[0][0][2]
+                segs = _split_seg(this_path[index], this_t)
+                if len(segs) > 1:
+                    this_path.pop(index)
+                    this_path.insert(index, segs[1])
+                    this_path.insert(index, segs[0])
+                Path._partial_union_path(index, this_path, other_path, union_path)
+
+            else:
+                pt = this_path[index].point(0.5)
+                is_inside = len(other_path.intersect(SVGPath(Line(pt, pt.real - 10000j)))) % 2
+                if not is_inside:
+                    union_path.append(this_path[index])
+                Path._partial_union_path(index + 1, this_path, other_path, union_path)
+
+    @staticmethod
+    def _partial_intersection_path(index, this_path, other_path, intersection_path):
+        if index != len(this_path):
+            intersections = SVGPath(this_path[index]).intersect(other_path)
+            for i in reversed(range(len(intersections))):
+                if not 0.0001 < intersections[i][0][2] < 0.9999:
+                    intersections.pop(i)
+            if intersections:
+                this_t = intersections[0][0][2]
+                segs = _split_seg(this_path[index], this_t)
+                if len(segs) > 1:
+                    this_path.pop(index)
+                    this_path.insert(index, segs[1])
+                    this_path.insert(index, segs[0])
+                Path._partial_intersection_path(index, this_path, other_path, intersection_path)
+            else:
+                pt = this_path[index].point(0.5)
+                is_inside = len(other_path.intersect(SVGPath(Line(pt, pt.real - 10000j)))) % 2
+                if is_inside:
+                    intersection_path.append(this_path[index])
+                Path._partial_intersection_path(index + 1, this_path, other_path, intersection_path)
 
     # def _format_path_3d(self, data_3d):
     #     temp_map = dict()

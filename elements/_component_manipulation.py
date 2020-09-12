@@ -32,11 +32,11 @@ def _split_line(line, r):
     return [Line(line.start, p), Line(p, line.end)]
 
 
-def _update_comp_len_list(l, index):
-    l[index] = [l[index][0] / 2, l[index][1]]
-    l.insert(index + 1, l[index])
-    for i in range(index + 1, len(l)):
-        l[i][1] += 1
+def _split_seg(seg, breakpoint):
+    if type(seg) == CubicBezier:
+        return _split_bezier(seg, breakpoint)
+    elif type(seg) == Line:
+        return _split_line(seg, breakpoint)
 
 
 def _replace_by_beziers(path):
@@ -52,23 +52,17 @@ def _replace_by_beziers(path):
             xAxisRotation = path[i].rotation
             largeArcFlag = int(path[i].large_arc)
             sweepFlag = int(path[i].sweep)
-            curves = _arc2bezier(px, py, cx, cy, rx, ry, xAxisRotation,
-                                 largeArcFlag, sweepFlag)
-            curves[0] = [
-                round(path[i].start.real, 3),
-                round(path[i].start.imag, 3)
-            ] + curves[0]
-            del path[i]
+            curves = _arc2bezier(px, py, cx, cy, rx, ry, xAxisRotation, largeArcFlag, sweepFlag)
+            curves[0] = [path[i].start.real, path[i].start.imag] + curves[0]
             for j in range(1, len(curves)):
                 temp = curves[j - 1][-2:]
                 curves[j] = temp + curves[j]
             for curve in reversed(curves):
                 path.insert(
                     i,
-                    CubicBezier(*[
-                        complex(curve[2 * j], curve[2 * j + 1])
-                        for j in range(len(curve) // 2)
-                    ]))
+                    CubicBezier(
+                        *[complex(curve[2 * j], curve[2 * j + 1]) for j in range(len(curve) // 2)]))
+            path.pop(i + len(curves))
         elif type(path[i]) == QuadraticBezier:
             q0 = path[i].start
             q1 = path[i].control

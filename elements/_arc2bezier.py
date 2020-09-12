@@ -49,8 +49,7 @@ def _vectorAngle(ux, uy, vx, vy):
     return sign * math.acos(dot)
 
 
-def _getArcCenter(px, py, cx, cy, rx, ry, largeArcFlag, sweepFlag, sinphi,
-                  cosphi, pxp, pyp):
+def _getArcCenter(px, py, cx, cy, rx, ry, largeArcFlag, sweepFlag, sinphi, cosphi, pxp, pyp):
     rxsq = rx**2
     rysq = ry**2
     pxpsq = pxp**2
@@ -92,15 +91,7 @@ def _getArcCenter(px, py, cx, cy, rx, ry, largeArcFlag, sweepFlag, sinphi,
     return [centerx, centery, ang1, ang2]
 
 
-def _arc2bezier(px,
-                py,
-                cx,
-                cy,
-                rx,
-                ry,
-                xAxisRotation=0,
-                largeArcFlag=0,
-                sweepFlag=0):
+def _arc2bezier(px, py, cx, cy, rx, ry, xAxisRotation=0, largeArcFlag=0, sweepFlag=0):
     curves = []
 
     if (rx == 0 or ry == 0):
@@ -125,9 +116,8 @@ def _arc2bezier(px,
         rx *= math.sqrt(lambda_)
         ry *= math.sqrt(lambda_)
 
-    [centerx, centery, ang1,
-     ang2] = _getArcCenter(px, py, cx, cy, rx, ry, largeArcFlag, sweepFlag,
-                           sinphi, cosphi, pxp, pyp)
+    [centerx, centery, ang1, ang2] = _getArcCenter(px, py, cx, cy, rx, ry, largeArcFlag, sweepFlag,
+                                                   sinphi, cosphi, pxp, pyp)
 
     # If 'ang2' == 90.0000000001, then `ratio` will evaluate to
     # 1.0000000001. This causes `segments` to be greater than one, which is an
@@ -147,18 +137,8 @@ def _arc2bezier(px,
 
     beziers = []
     for curve in curves:
-        x1, y1 = _mapToEllipse(curve[0], rx, ry, cosphi, sinphi, centerx,
-                               centery)
-        x2, y2 = _mapToEllipse(curve[1], rx, ry, cosphi, sinphi, centerx,
-                               centery)
-        x, y = _mapToEllipse(curve[2], rx, ry, cosphi, sinphi, centerx,
-                             centery)
-        beziers.append([
-            round(x1, 3),
-            round(y1, 3),
-            round(x2, 3),
-            round(y2, 3),
-            round(x, 3),
-            round(y, 3)
-        ])
+        x1, y1 = _mapToEllipse(curve[0], rx, ry, cosphi, sinphi, centerx, centery)
+        x2, y2 = _mapToEllipse(curve[1], rx, ry, cosphi, sinphi, centerx, centery)
+        x, y = _mapToEllipse(curve[2], rx, ry, cosphi, sinphi, centerx, centery)
+        beziers.append([x1, y1, x2, y2, x, y])
     return beziers
