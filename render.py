@@ -22,59 +22,55 @@ class Renderer:
                              "-s", f"{self.width}x{self.height}",\
                              "-i", "-",\
                              "-c:v", "libx264",\
-                             "-crf", "0",\
-                             "-preset", "veryfast",\
+                             "-crf", "0", \
+                             "-preset", "ultrafast" if preview else "slower", \
                              "-pix_fmt", "yuv420p",\
                              "-threads", "10",\
                              "-an",
+                             "-tune", "animation",\
                              #"-loglevel", "error",\
                              f"{filename}.mp4"]), stdin=PIPE)
+
+    def save_frame_and_convert(self, frame, frame_number):
+        frame.save(f"img/{frame_number}.svg")
+        os.system(
+            f"convert img/{frame_number}.svg img/png/{frame_number}.png && mv img/{frame_number}.svg img/svg/")
 
     def render(self):
         os.system("mkdir -p img/svg && rm -rf img/svg/* && mkdir -p img/png && rm -rf img/png/*")
         frame_number = 0
-        processes = []
+        pipe_png_start_flag = True
         while frame_number <= self.timeline._lifetime:
             print(f"{frame_number}, {(frame_number/self.timeline._lifetime)*100:.2f}%", end="\r")
             frame = Frame(self.width, self.height)
             self.timeline.exec(frame_number, frame)
-            p = mp.Process(target=frame.save, args=(f"img/svg/{frame_number}.svg", ))
-            processes.append(p)
+            p = mp.Process(target=self.save_frame_and_convert, args=(frame,frame_number))
             p.start()
-            if len(processes) == 256:
-                for p in processes:
-                    p.join()
-                processes.clear()
-                self.pipe_png(frame_number, 256)
+
+            if pipe_png_start_flag:
+                mp.Process(target=self.pipe_png, args=(0, )).start()
+                pipe_png_start_flag = False
 
             for element in frame.elements.values():
                 element.dynamic_reset()
 
             frame_number += 1
 
-        for p in processes:
-            p.join()
-        self.pipe_png(self.timeline._lifetime, len(processes))
-        os.system(
-            "mkdir -p img/frames/ && mv img/png img/frames && cd img/frames && find . -type f -print0 | xargs -0 -I file mv --backup=numbered file . && rm -rf png"
-        )
 
-    def pipe_png(self, last_frame_number, number_of_frames):
-        first_frame_number = last_frame_number - number_of_frames + 1
-        os.system(f"mkdir -p img/lot/{first_frame_number} && mkdir -p img/png/{first_frame_number} && cd img && "\
-                  f"mv svg/{{{first_frame_number}..{last_frame_number}}}.svg lot/{first_frame_number}/ && "\
-                  f"cd lot/{first_frame_number} && "\
-                  "parallel convert '{} {.}.png' ::: *.svg && "\
-                  f"mv *.png ../../png/{first_frame_number}")
-        for i in range(first_frame_number, last_frame_number + 1):
-            if self.bool_save_video:
-                self.p.stdin.write(
-                    Popen(["cat", f"img/png/{first_frame_number}/{i}.png"],
+    def pipe_png(self, i):
+        if self.bool_save_video:
+            self.p.stdin.write(
+                    Popen(["cat", f"img/png/{i}.png"],
                           stdout=PIPE).stdout.read())
-            if not self.bool_save_frames:
-                os.system(
-                    f"rm img/png/{first_frame_number}/{i}.png && rm img/lot/{first_frame_number}/{i}.svg"
+        if not self.bool_save_frames:
+            os.system(
+                    f"rm img/png/{i}.png && rm img/svg/{i}.svg"
                 )
+
+        if i < self.timeline._lifetime:
+            while not os.path.exists(f"img/png/{i+1}.png"):
+                pass
+            self.pipe_png(i+1)
 
     # " DRI_PRIME=1 parallel convert '{} {.}.bmp' ::: *.svg &&"
     # " mv *.bmp ../bmps &&"
@@ -89,6 +85,7 @@ class Renderer:
     # "-movflags", "+faststart",\
     # "-profile:v", "high",\
     # "-tune", "animation",\
+    # "-crf", "18",\
     # "-preset", "ultrafast" if preview else "slower",\
 
     #"-frames:v", f"{number_of_svgs}",\
@@ -96,6 +93,8 @@ class Renderer:
     # "-q:a","1",\
     # "-ac","2",\
     # "-ar","48000",\
+
+    # parallel convert '{} {.}.png' ::: *.svg
 
     # def concat_partials(self):
     #     if self.bool_combine_partial_renders:
