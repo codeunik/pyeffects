@@ -28,13 +28,12 @@ class Renderer:
                              "-threads", "10",\
                              "-an",
                              "-tune", "animation",\
-                             #"-loglevel", "error",\
+                             "-loglevel", "error",\
                              f"{filename}.mp4"]), stdin=PIPE)
 
     def save_frame_and_convert(self, frame, frame_number):
         frame.save(f"img/{frame_number}.svg")
-        os.system(
-            f"convert img/{frame_number}.svg img/png/{frame_number}.png && mv img/{frame_number}.svg img/svg/")
+        os.system(f"convert img/{frame_number}.svg img/png/{frame_number}.png && mv img/{frame_number}.svg img/svg/")
 
     def render(self):
         os.system("mkdir -p img/svg && rm -rf img/svg/* && mkdir -p img/png && rm -rf img/png/*")
@@ -59,13 +58,10 @@ class Renderer:
 
     def pipe_png(self, i):
         if self.bool_save_video:
-            self.p.stdin.write(
-                    Popen(["cat", f"img/png/{i}.png"],
-                          stdout=PIPE).stdout.read())
+            self.p.stdin.write(Popen(["cat", f"img/png/{i}.png"], stdout=PIPE).stdout.read())
+
         if not self.bool_save_frames:
-            os.system(
-                    f"rm img/png/{i}.png && rm img/svg/{i}.svg"
-                )
+            os.system(f"rm img/png/{i}.png && rm img/svg/{i}.svg")
 
         if i < self.timeline._lifetime:
             while not os.path.exists(f"img/png/{i+1}.png"):
