@@ -1,6 +1,7 @@
+from .elements.utils import Color
 FONT_INCONSOLATA = "Inconsolata"
 
-COLOR_GRAY = [
+COLOR_GRAY = [Color.hex(color) for color in [
     '#f9f9fa',
     '#eceeef',
     '#dee1e3',
@@ -11,8 +12,8 @@ COLOR_GRAY = [
     '#7f8b93',
     '#606e79',
     '#374047',
-]
-COLOR_BLUE = [
+]]
+COLOR_BLUE = [Color.hex(color) for color in [
     '#f6fafd',
     '#e2eff9',
     '#cce4f5',
@@ -23,8 +24,8 @@ COLOR_BLUE = [
     '#2d8fd5',
     '#006fbe',
     '#004170',
-]
-COLOR_INDIGO = [
+]]
+COLOR_INDIGO = [Color.hex(color) for color in [
     '#f9f9fe',
     '#ebedfb',
     '#dddff8',
@@ -35,8 +36,8 @@ COLOR_INDIGO = [
     '#7780e4',
     '#525edc',
     '#0516cd',
-]
-COLOR_VIOLET = [
+]]
+COLOR_VIOLET = [Color.hex(color) for color in [
     '#fbf8fe',
     '#f1ebfb',
     '#e8dcf8',
@@ -47,8 +48,8 @@ COLOR_VIOLET = [
     '#a172e3',
     '#864adb',
     '#4c00b8',
-]
-COLOR_FUSCHIA = [
+]]
+COLOR_FUSCHIA = [Color.hex(color) for color in [
     '#fdf8fe',
     '#f9e8fa',
     '#f5d8f7',
@@ -59,9 +60,9 @@ COLOR_FUSCHIA = [
     '#d153dd',
     '#bb01cc',
     '#72007c',
-]
+]]
 
-COLOR_PINK = [
+COLOR_PINK = [Color.hex(color) for color in [
     '#fef8fb',
     '#fbe9f3',
     '#f7d8ea',
@@ -72,9 +73,9 @@ COLOR_PINK = [
     '#dd57a5',
     '#cf0d7e',
     '#7f004a',
-]
+]]
 
-COLOR_RED = [
+COLOR_RED = [Color.hex(color) for color in [
     '#fef8f9',
     '#fbe9eb',
     '#f8dadc',
@@ -85,9 +86,9 @@ COLOR_RED = [
     '#df5f6a',
     '#d2202f',
     '#85000b',
-]
+]]
 
-COLOR_ORANGE = [
+COLOR_ORANGE = [Color.hex(color) for color in [
     '#fdf9f5',
     '#f9ebe1',
     '#f5dccb',
@@ -98,9 +99,9 @@ COLOR_ORANGE = [
     '#d36d24',
     '#b54c00',
     '#6b2d00',
-]
+]]
 
-COLOR_YELLOW = [
+COLOR_YELLOW = [Color.hex(color) for color in [
     '#fbfaec',
     '#f3efc4',
     '#eae398',
@@ -111,9 +112,9 @@ COLOR_YELLOW = [
     '#978b00',
     '#776e00',
     '#464000',
-]
+]]
 
-COLOR_LIME = [
+COLOR_LIME = [Color.hex(color) for color in [
     '#f6fcee',
     '#e2f4c8',
     '#cbec9e',
@@ -124,9 +125,9 @@ COLOR_LIME = [
     '#599900',
     '#477900',
     '#294700',
-]
+]]
 
-COLOR_GREEN = [
+COLOR_GREEN = [Color.hex(color) for color in [
     '#f2fcf1',
     '#d6f6d3',
     '#b6efb1',
@@ -137,9 +138,9 @@ COLOR_GREEN = [
     '#0d9f00',
     '#0b7e00',
     '#064a00',
-]
+]]
 
-COLOR_TEAL = [
+COLOR_TEAL = [Color.hex(color) for color in [
     '#f1fcf6',
     '#d2f6e1',
     '#afefc9',
@@ -150,9 +151,9 @@ COLOR_TEAL = [
     '#009e42',
     '#007d34',
     '#004a1f',
-]
+]]
 
-COLOR_CYAN = [
+COLOR_CYAN = [Color.hex(color) for color in [
     '#f0fcfb',
     '#cef5f2',
     '#a8eee8',
@@ -163,4 +164,4 @@ COLOR_CYAN = [
     '#009a8d',
     '#007a70',
     '#004842',
-]
+]]
