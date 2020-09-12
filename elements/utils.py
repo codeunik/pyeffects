@@ -5,13 +5,17 @@ class Color:
     @staticmethod
     def hex(color):
         if len(color) == 7:
-            return np.array([int(color[i:i + 2], 16) for i in (1, 3, 5)], dtype=np.int)
+            return np.array([int(color[i:i + 2], 16)/255.0 for i in (1, 3, 5)], dtype=np.int)
         else:
-            return np.array([int(c * 2, 16) for c in color[1:]], dtype=np.int)
+            return np.array([int(c * 2, 16)/255.0 for c in color[1:]], dtype=np.int)
 
     @staticmethod
-    def rgb(color):
-        return np.array(color, dtype=np.int)
+    def rgb255(color):
+        return np.array(color)/255.0
+
+    @staticmethod
+    def rgb1(color):
+        return np.array(color)
 
     @staticmethod
     def to_hex(color):

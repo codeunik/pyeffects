@@ -55,8 +55,8 @@ class Element(Transform, Place):
             self._stroke = color
         elif isinstance(color, RadialGradient):
             self._stroke = color
-        elif isinstance(color, list):
-            self._stroke = Color.rgb(color)
+        elif isinstance(color, list) or isinstance(color, tuple):
+            self._stroke = Color.rgb255(color)
         else:
             self._stroke = color
         return self
@@ -66,8 +66,8 @@ class Element(Transform, Place):
             self._fill = color
         elif isinstance(color, RadialGradient):
             self._fill = color
-        elif isinstance(color, list):
-            self._fill = Color.rgb(color)
+        elif isinstance(color, list) or isinstance(color, tuple):
+            self._fill = Color.rgb255(color)
         else:
             self._fill = color
         return self
@@ -169,7 +169,7 @@ class Element(Transform, Place):
         if type(color) == str:
             return color
         else:
-            return f"rgb{tuple(color)}"
+            return f"rgb{tuple(color*255)}"
 
     def _str_stroke(self):
         if isinstance(self._stroke, LinearGradient):

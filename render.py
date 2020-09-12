@@ -1,4 +1,3 @@
-import base64
 import multiprocessing as mp
 import os
 from subprocess import PIPE, Popen
@@ -25,7 +24,6 @@ class Renderer:
                              "-crf", "0", \
                              "-preset", "ultrafast" if preview else "slower", \
                              "-pix_fmt", "yuv420p",\
-                             "-threads", "10",\
                              "-an",
                              "-tune", "animation",\
                              "-loglevel", "error",\
@@ -40,7 +38,8 @@ class Renderer:
         frame_number = 0
         pipe_png_start_flag = True
         while frame_number <= self.timeline._lifetime:
-            print(f"{frame_number}, {(frame_number/self.timeline._lifetime)*100:.2f}%", end="\r")
+            print(f"complete: {(frame_number/self.timeline._lifetime)*100:.2f}%")
+            print(f"creating frame: {frame_number}")
             frame = Frame(self.width, self.height)
             self.timeline.exec(frame_number, frame)
             p = mp.Process(target=self.save_frame_and_convert, args=(frame,frame_number))
@@ -58,14 +57,15 @@ class Renderer:
 
     def pipe_png(self, i):
         if self.bool_save_video:
+            while not os.path.exists(f"img/png/{i}.png"):
+                pass
+            print(f"rendering frame: {i}")
             self.p.stdin.write(Popen(["cat", f"img/png/{i}.png"], stdout=PIPE).stdout.read())
 
         if not self.bool_save_frames:
             os.system(f"rm img/png/{i}.png && rm img/svg/{i}.svg")
 
         if i < self.timeline._lifetime:
-            while not os.path.exists(f"img/png/{i+1}.png"):
-                pass
             self.pipe_png(i+1)
 
     # " DRI_PRIME=1 parallel convert '{} {.}.bmp' ::: *.svg &&"
