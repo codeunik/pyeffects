@@ -43,20 +43,20 @@ class Frame:
     def save(self, path):
         z_indexed_elements = list(self.elements.values())
         z_indexed_elements.sort(key=lambda element: element.get_z_index())
+        svg_desc = self._header
+
+        svg_desc += "<defs>"
+        for d in self.defs.values():
+            svg_desc += d._str_def()
+        svg_desc += "</defs>"
+
+        for element in z_indexed_elements:
+            svg_desc += element._draw()
+            #element.dynamic_reset()
+            svg_desc += "</g></svg>"
+
         with open(path, "w") as f:
-            f.write(self._header)
-
-        with open(path, "a") as f:
-            f.write("<defs>")
-            for d in self.defs.values():
-                f.write(d._str_def())
-            f.write("</defs>")
-
-            for element in z_indexed_elements:
-                f.write(element._draw())
-                #element.dynamic_reset()
-            f.write("</g></svg>")
-
+            f.write(svg_desc)
 
 class Scene:
     count = 1

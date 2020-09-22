@@ -2,15 +2,14 @@ from copy import deepcopy
 
 import numpy as np
 
-from ._component_manipulation import (_replace_by_beziers, _split_bezier,
-                                      _split_seg)
+from ._component_manipulation import (_replace_by_beziers, _split_seg)
 from .camera import Camera
 from .defs import LinearGradient, RadialGradient
 from .element import Element
 from .group import Group
 from .light import Light
 from .svgpathtools import Path as SVGPath
-from .svgpathtools import Arc, CubicBezier, Line, QuadraticBezier, parse_path
+from .svgpathtools import Arc, CubicBezier, Line, parse_path
 from .utils import unit_vector
 
 
@@ -141,7 +140,7 @@ class Path(Element):
             if isinstance(self._fill, np.ndarray):
                 self._get_vertex_avg()
                 face_to_light = unit_vector(Light.get_position() - self._vertex_avg)
-                face_normal = unit_vector(self._transformed_points[-1])
+                face_normal = unit_vector(self.transform_3d().dot(np.array([0,0,1,0])))
                 ambient_coeff = 0.33
                 diffuse_coeff = 0.67 * (abs(face_normal[:3].dot(face_to_light[:3])))
                 color = self._fill * (ambient_coeff + diffuse_coeff)
@@ -179,7 +178,6 @@ class Path(Element):
                     index += 1
                 point_index += 1
             comp_index += 1
-        self._data_3d.append([0.0, 0, 1, 0])
         self._data_3d = np.array(self._data_3d)
 
     def _convert_3d_to_2d(self):
