@@ -107,12 +107,12 @@ class Path(Element):
         return self
 
     def _create_bbox(self):
-        x_min = self._data_3d[:-1, 0].min()
-        y_min = self._data_3d[:-1, 1].min()
-        z_min = self._data_3d[:-1, 2].min()
-        x_max = self._data_3d[:-1, 0].max()
-        y_max = self._data_3d[:-1, 1].max()
-        z_max = self._data_3d[:-1, 2].max()
+        x_min = self._data_3d[:, 0].min()
+        y_min = self._data_3d[:, 1].min()
+        z_min = self._data_3d[:, 2].min()
+        x_max = self._data_3d[:, 0].max()
+        y_max = self._data_3d[:, 1].max()
+        z_max = self._data_3d[:, 2].max()
         self._bbox = np.array([
             [x_min, y_min, z_min, 1.0],    # 0, 0, 0
             [x_min, y_min, z_max, 1.0],    # 0, 0, 1

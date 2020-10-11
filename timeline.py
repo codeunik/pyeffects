@@ -86,15 +86,12 @@ class ElementRemover:
 
 
 class Timeline:
-    fps = 60
+    fps = 24
     frame_elements = dict()
 
     def __init__(self, fps=None):
         if fps:
             Timeline.fps = fps
-        # if is_master:
-        #     # This timeline should be used for adding dynamic tweens
-        #     Timeline.master = self
 
         self._cursor = 0
         self._lifetime = 0
