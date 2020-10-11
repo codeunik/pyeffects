@@ -41,17 +41,95 @@ class Gourad(Def):
 #   </g>
 # </svg>
 
-
-class LinearGradient(Def):
-    count = 0
+class FilterEffect(Def):
+    _fe_count = 0
+    _component_count = 0
+    _result_count = 0
 
     def __init__(self):
-        self.id = f"lg{LinearGradient.count}"
-        LinearGradient.count += 1
+        self.id = self.id = f"f{FilterEffect._fe_count}"
+        FilterEffect._fe_count += 1
+        # x, y, width, height, filterUnits="userSpaceOnUse"
+        self.filter_effect_info = dict()
+
+    def gaussian_blur(self, stdDeviation=None, result=None, component_id=None):
+        params = locals()
+        params["name"] = "feGaussianBlur"
+        return self._handler(params)
+
+    def flood(self, flood_color=None, result=None, component_id=None):
+        params = locals()
+        params["name"] = "feFlood"
+        return self._handler(params)
+
+    def offset(self, source=None, dx=None, dy=None, component_id=None):
+        params = locals()
+        params["name"] = "feOffset"
+        params["in"] = params.pop("source")
+        return self._handler(params)
+
+    def composite(self, in1=None, in2=None, operator=None, result=None, component_id=None):
+        """operators: over | in | out | atop | xor | lighter | arithmetic"""
+        params = locals()
+        params["name"] = "feComposite"
+        return self._handler(params)
+
+    def merge(self, *sources, component_id=None):
+        params = locals()
+        params["name"] = "feMerge"
+        params["inside"] = ""
+        for i in range(len(sources)):
+            params["inside"] += f'<feMergeNode in="{sources[i]}"/>'
+        return self._handler(params)
+
+    def morphology(self, source=None, operator=None, radius=None, result=None, component_id=None):
+        """operators: erode | dilate"""
+        params = locals()
+        params["name"] = "feOffset"
+        params["in"] = params.pop("source")
+        return self._handler(params)
+
+    def _handler(self, info):
+        info.pop("self")
+        component_id = info.pop("component_id")
+        if not component_id:
+            self.component_id = f"c{FilterEffect._component_count}"
+            FilterEffect._component_count += 1
+
+            desc = dict()
+            for k, v in info.items():
+                desc[k.replace("_","-")] = v
+
+            self.filter_effect_info[self.component_id] = desc
+
+            return self.component_id
+        else:
+            for k, v in info.items():
+                if v is not None:
+                    self.filter_effect_info[component_id][k.replace("_", "-")] = str(v)
+
+    def _str_def(self):
+        s = f'<filter id="{self.id}">'
+        for component in self.filter_effect_info.values():
+            s += f'<{component["name"]} '
+            for k, v in component.items():
+                if k not in ["name", "inside"] and v is not None:
+                    s += (k +f'="{v}" ')
+            s += f'>{component.get("inside", "")}</{component["name"]}>'
+        s += "</filter>"
+        print(s)
+        return s
+
+class LinearGradient(Def):
+    _count = 0
+
+    def __init__(self):
+        self.id = f"lg{LinearGradient._count}"
+        LinearGradient._count += 1
         self.x1 = 0
         self.y1 = 0
         self.x2 = 1
-        self.y2 = 1
+        self.y2 = 0
         self.gradients = []
 
     def spread(self, x1, y1, x2, y2):
@@ -76,11 +154,11 @@ class LinearGradient(Def):
 
 
 class RadialGradient(Def):
-    count = 0
+    _count = 0
 
     def __init__(self):
-        self.id = f"rg{RadialGradient.count}"
-        RadialGradient.count += 1
+        self.id = f"rg{RadialGradient._count}"
+        RadialGradient._count += 1
         self.cx = 0.5
         self.cy = 0.5
         self.r = 0.5
@@ -114,11 +192,11 @@ class RadialGradient(Def):
 
 
 class ClipPath(Def):
-    count = 0
+    _count = 0
 
     def __init__(self, element):
-        self.id = f"cp{ClipPath.count}"
-        ClipPath.count += 1
+        self.id = f"cp{ClipPath._count}"
+        ClipPath._count += 1
         self.element = element
 
     def _str_def(self):
@@ -126,11 +204,11 @@ class ClipPath(Def):
 
 
 class Mask(Def):
-    count = 0
+    _count = 0
 
     def __init__(self, element):
-        self.id = f"m{Mask.count}"
-        Mask.count += 1
+        self.id = f"m{Mask._count}"
+        Mask._count += 1
         self.element = element
 
     def _str_def(self):

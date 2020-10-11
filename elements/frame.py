@@ -12,7 +12,7 @@ class FrameConfig:
 
 
 class Frame:
-    def_types = ["_fill", "_clip_path", "_mask", "_stroke"]
+    def_types = ["_fill", "_stroke", "_filter", "_clip_path", "_mask"]
 
     def __init__(self, width=FrameConfig.width, height=FrameConfig.height):
         self._header = f'''<svg width="{width}" height="{height}" version="1.1" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g transform="matrix(1, 0, 0, -1, 0, 1080)">'''
@@ -52,8 +52,8 @@ class Frame:
 
         for element in z_indexed_elements:
             svg_desc += element._draw()
-            #element.dynamic_reset()
-            svg_desc += "</g></svg>"
+        #element.dynamic_reset()
+        svg_desc += "</g></svg>"
 
         with open(path, "w") as f:
             f.write(svg_desc)

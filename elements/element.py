@@ -12,7 +12,7 @@ class Element(Transform, Place):
     attrs = [
         "_stroke", "_stroke_width", "_fill", "_opacity", "_fill_opacity", "_stroke_opacity",
         "_stroke_linecap", "_stroke_linejoin", "_stroke_dasharray", "_fill_rule",
-        "_stroke_miterlimit", "_stroke_dashoffset", "_clip_path", "_mask"
+        "_stroke_miterlimit", "_stroke_dashoffset", "_clip_path", "_mask", "_filter"
     ]
 
     def __init__(self):
@@ -31,6 +31,7 @@ class Element(Transform, Place):
         self._fill_rule = "nil"
         self._clip_path = "nil"
         self._mask = "nil"
+        self._filter = "nil"
         self._z_index = None
 
         Transform.__init__(self)
@@ -120,6 +121,10 @@ class Element(Transform, Place):
         self._mask = mask
         return self
 
+    def filter(self, filter):
+        self._filter = filter
+        return self
+
     def get_z_index(self):
         return 0 if self._z_index is None else self._z_index
 
@@ -164,6 +169,9 @@ class Element(Transform, Place):
 
     def get_mask(self):
         return self._mask
+
+    def get_filter(self):
+        return self._filter
 
     def _str_color(self, color):
         if type(color) == str:
@@ -223,3 +231,7 @@ class Element(Transform, Place):
 
     def _str_mask(self):
         return f'mask="url(#{self._mask.id})"'
+
+    def _str_filter(self):
+        return f'filter="url(#{self._filter.id})"'
+
