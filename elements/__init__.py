@@ -1,5 +1,5 @@
 from .camera import Camera
-from .defs import ClipPath, LinearGradient, Mask, RadialGradient, FilterEffect
+from .defs import ClipPath, LinearGradient, Mask, RadialGradient, FilterEffect, Gourad
 from .frame import Frame, Scene
 from .group import Group
 from .image import Image

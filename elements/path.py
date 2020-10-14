@@ -2,9 +2,9 @@ from copy import deepcopy
 
 import numpy as np
 
-from ._component_manipulation import (_replace_by_beziers, _split_seg)
+from .modify_curves import (_replace_by_beziers, _split_seg)
 from .camera import Camera
-from .defs import LinearGradient, RadialGradient
+from .defs import LinearGradient, RadialGradient, Gourad
 from .element import Element
 from .group import Group
 from .light import Light
@@ -14,10 +14,10 @@ from .utils import unit_vector
 
 
 class Path(Element):
-    def __init__(self, data=None, has_shading=False):
+    def __init__(self, data=None, shading_type=None):
         self._data_3d = []
         self._index_map = dict()
-        self._has_shading = has_shading
+        self._shading_type = shading_type
         self._bbox = None
         self._transformed_points = None
         self._vertex_avg = None
@@ -65,8 +65,8 @@ class Path(Element):
         self._create_bbox()
         return self
 
-    def has_shading(self, has_shading):
-        self._has_shading = has_shading
+    def shading_type(self, shading_type):
+        self._shading_type = shading_type
         return self
 
     def get_z_index(self):
@@ -136,15 +136,26 @@ class Path(Element):
         return self._data_2d.length()
 
     def _str_fill(self):
-        if self._has_shading:
+        if self._shading_type:
             if isinstance(self._fill, np.ndarray):
-                self._get_vertex_avg()
-                face_to_light = unit_vector(Light.get_position() - self._vertex_avg)
-                face_normal = unit_vector(self.transform_3d().dot(np.array([0,0,1,0])))
-                ambient_coeff = 0.33
-                diffuse_coeff = 0.67 * (abs(face_normal[:3].dot(face_to_light[:3])))
-                color = self._fill * (ambient_coeff + diffuse_coeff)
-                return f'fill="rgb{tuple(color)}"'
+                if self._shading_type == 1:
+                    self._get_vertex_avg()
+                    face_to_light = unit_vector(Light.get_position() - self._vertex_avg)
+                    face_normal = unit_vector(self.transform_3d().dot(np.array([0,0,1,0])))
+                    ambient_coeff = 0.33
+                    diffuse_coeff = 0.67 * (abs(face_normal[:3].dot(face_to_light[:3])))
+                    color = self._fill * (ambient_coeff + diffuse_coeff)
+                    return f'fill="rgb{tuple(color)}"'
+                elif self._shading_type == 2:
+                    face_normal = unit_vector(self.transform_3d().dot(np.array([0, 0, 1, 0])))
+                    colors = []
+                    ambient_coeff = 0.33
+                    for i in range(len(self._data_3d)):
+                        corner_to_light = unit_vector(Light.get_position() - self._data_3d[i])
+                        diffuse_coeff = 0.67 * (abs(face_normal[:3].dot(corner_to_light[:3])))
+                        colors.append(self._fill * (ambient_coeff + diffuse_coeff))
+                    self.filter(Gourad(self, colors))
+                    return f'fill="none"'
         if isinstance(self._fill, LinearGradient):
             return f'fill="url(#{self._fill.id})"'
         elif isinstance(self._fill, RadialGradient):

@@ -26,18 +26,9 @@ class Frame:
                 self.groups.setdefault(id(elements), False)
                 for element in elements:
                     self.elements.setdefault(id(element), element)
-
-                    for _type in self.def_types:
-                        if isinstance(getattr(element, _type), Def):
-                            self.defs.setdefault(
-                                getattr(element, _type).id, getattr(element, _type))
-
         elif isinstance(elements, Element):
             self.elements.setdefault(id(elements), elements)
 
-            for _type in self.def_types:
-                if isinstance(getattr(elements, _type), Def):
-                    self.defs.setdefault(getattr(elements, _type).id, getattr(elements, _type))
         return self
 
     def save(self, path):
@@ -45,13 +36,17 @@ class Frame:
         z_indexed_elements.sort(key=lambda element: element.get_z_index())
         svg_desc = self._header
 
+        for element in z_indexed_elements:
+            svg_desc += element._draw()
+            for _type in self.def_types:
+                if isinstance(getattr(element, _type), Def):
+                    self.defs.setdefault(getattr(element, _type).id, getattr(element, _type))
+
         svg_desc += "<defs>"
         for d in self.defs.values():
             svg_desc += d._str_def()
         svg_desc += "</defs>"
 
-        for element in z_indexed_elements:
-            svg_desc += element._draw()
         #element.dynamic_reset()
         svg_desc += "</g></svg>"
 

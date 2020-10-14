@@ -19,6 +19,7 @@ class Color:
 
     @staticmethod
     def to_hex(color):
+        color *= 255
         rgb = color.astype(int)
         return "#{0:02x}{1:02x}{2:02x}".format(*rgb)
 

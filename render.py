@@ -1,72 +1,99 @@
 import multiprocessing as mp
 import os
-from subprocess import PIPE, Popen
-
 from .elements.frame import Frame
-
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+import threading
 
 class Renderer:
-    def __init__(self, timeline, preview=True, filename="mov", save_video=True, save_frames=False):
+    def __init__(self, timeline, preview=True, filename="mov", save_pngs=True, save_video=False):
         self.timeline = timeline
         self.width = 640 if preview else 1920
         self.height = 360 if preview else 1080
-        self.bool_save_frames = save_frames
-        self.bool_save_video = save_video
-        if self.bool_save_video:
-            self.p = Popen((["ffmpeg",
-                             "-y",
-                             "-f", "image2pipe",\
-                             "-vcodec", "png",\
-                             "-framerate", f"{self.timeline.fps}",\
-                             "-s", f"{self.width}x{self.height}",\
-                             "-i", "-",\
-                             "-c:v", "libx264",\
-                             "-crf", "0", \
-                             "-preset", "ultrafast" if preview else "slower", \
-                             "-pix_fmt", "yuv420p",\
-                             "-an",
-                             "-tune", "animation",\
-                             "-loglevel", "error",\
-                             f"{filename}.mp4"]), stdin=PIPE)
-
-    def save_frame_and_convert(self, frame, frame_number):
-        frame.save(f"img/{frame_number}.svg")
-        os.system(f"convert img/{frame_number}.svg img/png/{frame_number}.png && mv img/{frame_number}.svg img/svg/")
+        self.preview = preview
+        self.filename = filename
+        self.bool_save_pngs = save_pngs
+        self.bool_save_video = save_video and self.bool_save_pngs
+        chrome_options = Options()
+        chrome_options.add_argument("--headless")
+        self.drivers = [webdriver.Chrome(chrome_options=chrome_options) for _ in range(mp.cpu_count())]
+        # set viewport to be the image size
+        for i in range(len(self.drivers)):
+            window_size = self.drivers[i].execute_script(
+            """
+            return [window.outerWidth - window.innerWidth + arguments[0],
+              window.outerHeight - window.innerHeight + arguments[1]];
+            """, self.width, self.height)
+            self.drivers[i].set_window_size(*window_size)
+        self.cwd = os.getcwd()
 
     def render(self):
-        os.system("mkdir -p img/svg && rm -rf img/svg/* && mkdir -p img/png && rm -rf img/png/*")
+        os.system("mkdir -p mov && rm -rf mov/* && mkdir -p img/svg && rm -rf img/svg/* && mkdir -p img/png && rm -rf img/png/*")
         frame_number = 0
-        pipe_png_start_flag = True
+        processes = []
         while frame_number <= self.timeline._lifetime:
             print(f"complete: {(frame_number/self.timeline._lifetime)*100:.2f}%")
             print(f"creating frame: {frame_number}")
             frame = Frame(self.width, self.height)
             self.timeline.exec(frame_number, frame)
-            p = mp.Process(target=self.save_frame_and_convert, args=(frame,frame_number))
+            p = mp.Process(target=frame.save, args=(f"img/svg/{frame_number}.svg",))
             p.start()
-
-            if pipe_png_start_flag:
-                mp.Process(target=self.pipe_png, args=(0, )).start()
-                pipe_png_start_flag = False
+            processes.append(p)
 
             for element in frame.elements.values():
                 element.dynamic_reset()
 
+            if len(processes) == 256:
+                for p in processes:
+                    p.join()
+                processes.clear()
+
             frame_number += 1
 
+        for p in processes:
+            p.join()
+        processes.clear()
 
-    def pipe_png(self, i):
+        if self.bool_save_pngs:
+            q = mp.Queue(maxsize=mp.cpu_count())
+            threads = []
+            for i in range(mp.cpu_count()):
+                q.put(i)
+            frame_number = 0
+            while frame_number <= self.timeline._lifetime:
+                if not q.empty():
+                    t = threading.Thread(target=self.save_png, args=(frame_number, q))
+                    threads.append(t)
+                    t.start()
+                    frame_number += 1
+
+            for t in threads:
+                t.join()
+
+        for i in range(mp.cpu_count()):
+            self.drivers[i].quit()
+
         if self.bool_save_video:
-            while not os.path.exists(f"img/png/{i}.png"):
-                pass
-            print(f"rendering frame: {i}")
-            self.p.stdin.write(Popen(["cat", f"img/png/{i}.png"], stdout=PIPE).stdout.read())
+            os.system(" ".join(["cd img/png &&",
+                                "ffmpeg",
+                                "-y",
+                                "-vcodec", "png",
+                                "-i", "%d.png",
+                                "-c:v", "libx264",
+                                "-crf", "0" if self.preview else "17",
+                                "-preset", "ultrafast" if self.preview else "slower",
+                                "-pix_fmt", "yuv420p",
+                                "-an",
+                                "-tune", "animation",
+                                f"{self.filename}.mp4",
+                                f"&& mv {self.filename}.mp4 ../../mov/"]))
 
-        if not self.bool_save_frames:
-            os.system(f"rm img/png/{i}.png && rm img/svg/{i}.svg")
+    def save_png(self, frame_number, q):
+        i = q.get()
+        self.drivers[i].get("file://"+self.cwd+f"/img/svg/{frame_number}.svg")
+        self.drivers[i].save_screenshot(self.cwd+f"/img/png/{frame_number}.png")
+        q.put(i)
 
-        if i < self.timeline._lifetime:
-            self.pipe_png(i+1)
 
     # " DRI_PRIME=1 parallel convert '{} {.}.bmp' ::: *.svg &&"
     # " mv *.bmp ../bmps &&"
@@ -106,3 +133,20 @@ class Renderer:
     #                             "-c", "copy",\
     #                             "-loglevel", "error",\
     #                             "mov.mp4"]))
+    #
+    #     if self.bool_save_video:
+    #         self.p = Popen((["ffmpeg",
+    #                          "-y",
+    #                          "-f", "image2pipe",\
+    #                          "-vcodec", "png",\
+    #                          "-framerate", f"{self.timeline.fps}",\
+    #                          "-s", f"{self.width}x{self.height}",\
+    #                          "-i", "%d.png",\
+    #                          "-c:v", "libx264",\
+    #                          "-crf", "0", \
+    #                          "-preset", "ultrafast" if preview else "slower", \
+    #                          "-pix_fmt", "yuv420p",\
+    #                          "-an",
+    #                          "-tune", "animation",\
+    #                          "-loglevel", "error",\
+    #                          f"{filename}.mp4"]), stdin=PIPE)

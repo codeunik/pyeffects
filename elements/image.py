@@ -1,5 +1,5 @@
 import numpy as np
-
+import os
 from .element import Element
 
 
@@ -22,10 +22,10 @@ class Image(Element):
         self.img_path = img_path
 
     def _draw(self):
-        attr_str = f'<image x="{self.x}" y="{self.y}" width="{self.width}" height="{self.height}" href="{self.img_path}" transform="{tuple(self.transform_2d())}"'
+        attr_str = f'<image x="{self.x}" y="{self.y}" width="{self.width}" height="{self.height}" href="{os.getcwd()}/{self.img_path}" transform="matrix{tuple(self.transform_2d())}"'
         attr_str += super()._draw()
         attr_str += "></image>"
-        return s
+        return attr_str
 
     def _border_length(self):
         a00, a10, a01, a11, a02, a12 = self.transform_2d()
@@ -37,11 +37,20 @@ class Image(Element):
             [self.x, self.y + self.height, 1],
         ])
         transformed_vertices = matrix.dot(vertices.T).T
-        return np.linalg.norm(vertices[1] - vertices[0])\
-            + np.linalg.norm(vertices[2] - vertices[1])\
-            + np.linalg.norm(vertices[3] - vertices[2])\
-            + np.linalg.norm(vertices[0] - vertices[3])
+        return np.linalg.norm(transformed_vertices[1] - transformed_vertices[0])\
+            + np.linalg.norm(transformed_vertices[2] - transformed_vertices[1])\
+            + np.linalg.norm(transformed_vertices[3] - transformed_vertices[2])\
+            + np.linalg.norm(transformed_vertices[0] - transformed_vertices[3])
 
-    #TODO
     def bbox(self):
-        pass
+        a00, a10, a01, a11, a02, a12 = self.transform_2d()
+        matrix = np.array([[a00, a01, a02], [a10, a11, a12], [0, 0, 1]])
+        vertices = np.array([
+            [self.x, self.y, 1],
+            [self.x + self.width, self.y, 1],
+            [self.x + self.width, self.y + self.height, 1],
+            [self.x, self.y + self.height, 1],
+        ])
+        transformed_vertices = matrix.dot(vertices.T).T
+        return np.array([[transformed_vertices[:,0].min(), transformed_vertices[:,1].min(), 1.0, 1.0],
+                         [transformed_vertices[:,0].max(), transformed_vertices[:,1].max(), 1.0, 1.0]])
