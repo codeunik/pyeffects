@@ -4,7 +4,7 @@ from .camera import Camera
 from .defs import Def
 from .element import Element
 from .group import Group
-import os
+
 
 class FrameConfig:
     width = 1920
