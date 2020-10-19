@@ -4,16 +4,18 @@ from ..dynamic_data import DynamicDataIdentifier
 from ..elements.element import Element
 from ..elements.group import Group
 from ..elements.utils import Color
-
+import os
+import hashlib
 
 class Tween:
-    def __init__(self, on_update=None, on_update_args=None):
+    def __init__(self, on_update=None, kwargs_dict=None):
 
         self.on_update = on_update
-        self.on_update_args = on_update_args
+        self.on_update_kwargs = kwargs_dict
 
         self.start_frame = 0
         self.end_frame = -1
+        self.fps = None
         self.dynamic_data_flag = 1
 
     def set_elements(self, elements):
@@ -28,26 +30,27 @@ class Tween:
                 if isinstance(getattr(self, var), DynamicDataIdentifier):
                     setattr(self, var, getattr(self, var).get())
             self.dynamic_data_flag = 0
-        t = self.progress(frame_number)
+
         if self.on_update:
-            self.on_update(*self.on_update_kwargs, t=t)
+            self.on_update(self, **self.on_update_kwargs)
 
-        return self.update(t)
+        return self.update(self.rel_frame_number(frame_number))
 
-    def update(self, t):
+    def update(self, rel_frame_number):
         return [self.elements]
 
-    def progress(self, frame_number):
-        if frame_number == self.start_frame:
-            return 0
-        elif frame_number == self.end_frame:
-            return 1
-        else:
-            return (frame_number - self.start_frame) / (self.end_frame - self.start_frame)
+    def rel_frame_number(self, frame_number):
+        return frame_number - self.start_frame
 
-    def timing(self, start_frame, end_frame):
+    def progress(self, rel_frame_number):
+        if self.start_frame == self.end_frame:
+            return 1
+        return rel_frame_number / (self.end_frame - self.start_frame)
+
+    def timing(self, start_frame, end_frame, fps):
         self.start_frame = start_frame
         self.end_frame = end_frame
+        self.fps = fps
 
 
 class translate(Tween):
@@ -57,7 +60,8 @@ class translate(Tween):
         self.z = z
         super().__init__(**kwargs)
 
-    def update(self, t):
+    def update(self, rel_frame_number):
+        t = self.progress(rel_frame_number)
         et = self.ease(t)
         if t == 1:
             self.elements.translate(et * self.x, et * self.y, et * self.z)
@@ -89,7 +93,8 @@ class scale(Tween):
         self.anchor = anchor[:]
         super().__init__(**kwargs)
 
-    def update(self, t):
+    def update(self, rel_frame_number):
+        t = self.progress(rel_frame_number)
         et = self.ease(t)
         if t == 1:
             self.elements.scale(1 + et * (self.sx - 1), 1 + et * (self.sy - 1),
@@ -122,7 +127,8 @@ class rotate(Tween):
         self.anchor = anchor[:]
         super().__init__(**kwargs)
 
-    def update(self, t):
+    def update(self, rel_frame_number):
+        t = self.progress(rel_frame_number)
         et = self.ease(t)
         if t == 1:
             self.elements.rotate(et * self.angle, self.axis, self.anchor)
@@ -137,7 +143,8 @@ class Common(Tween):
         self.p2 = val
         super().__init__(**kwargs)
 
-    def update(self, t):
+    def update(self, rel_frame_number):
+        t = self.progress(rel_frame_number)
         et = self.ease(t)
         if type(self.elements) == Group:
             for element in self.elements:
@@ -213,18 +220,37 @@ class draw(Tween):
         self.end = np.array(end)
         super().__init__(**kwargs)
 
-    def update(self, t):
+    def update(self, rel_frame_number):
+        t = self.progress(rel_frame_number)
         et = self.ease(t)
         self.elements.stroke_dasharray((1 - et) * self.start + et * self.end)
         return [self.elements]
 
+class play(Tween):
+    def __init__(self, start_sec=0, speed=1, **kwargs):
+        self.start_sec = start_sec
+        self.speed = speed
+        super().__init__(**kwargs)
+
+    def update(self, rel_frame_number):
+        if rel_frame_number == 0:
+            video_duration = self.speed * (self.end_frame - self.start_frame)/self.fps
+            video_fps = self.fps / self.speed
+            self.file_hash = hashlib.md5(
+                bytes(f"{self.elements.filepath, self.start_sec, self.speed, video_duration}", encoding="utf-8")).hexdigest()
+            # ffmpeg -i mov.mp4 -r 60 -f image2 image-%07d.png
+            os.system(f'mkdir -p /tmp/{self.file_hash} '
+                      + f'&& ffmpeg -ss {self.start_sec} -i {self.elements.filepath} -t {video_duration}'
+                      + f'-r {video_fps} -f image2 /tmp/{self.file_hash}/%d.png')
+
+        self.elements.set_image(f'/tmp/{self.file_hash}/{rel_frame_number+1}.png')
+        return [self.elements]
 
 class camera_position(Common):
     def update_element(self, element, et):
         if self.p1 is None:
             self.p1 = element._position
         self.elements.set_position((1 - et) * self.p1 + et * self.p2)
-
 
 class camera_focus(Common):
     def update_element(self, element, et):

@@ -1,7 +1,7 @@
 import numpy as np
 import os
 from .element import Element
-
+import subprocess
 
 class Image(Element):
     def __init__(self, x, y, width, height, img_path):
@@ -9,7 +9,7 @@ class Image(Element):
         self.y = y
         self.width = width
         self.height = height
-        self.img_path = img_path
+        self.filepath = os.path.abspath(img_path)
         Element.__init__(self)
 
     def set_dimension(self, x=None, y=None, width=None, height=None):
@@ -19,10 +19,10 @@ class Image(Element):
         self.height = height if height else self.height
 
     def set_image(self, img_path):
-        self.img_path = img_path
+        self.filepath = os.path.abspath(img_path)
 
     def _draw(self):
-        attr_str = f'<image x="{self.x}" y="{self.y}" width="{self.width}" height="{self.height}" href="{os.getcwd()}/{self.img_path}" transform="matrix{tuple(self.transform_2d())}"'
+        attr_str = f'<image x="{self.x}" y="{self.y}" width="{self.width}" height="{self.height}" href="{self.filepath}" transform="matrix{tuple(self.transform_2d())}" '
         attr_str += super()._draw()
         attr_str += "></image>"
         return attr_str
@@ -54,3 +54,15 @@ class Image(Element):
         transformed_vertices = matrix.dot(vertices.T).T
         return np.array([[transformed_vertices[:,0].min(), transformed_vertices[:,1].min(), 1.0, 1.0],
                          [transformed_vertices[:,0].max(), transformed_vertices[:,1].max(), 1.0, 1.0]])
+
+
+class Video(Image):
+    def __init__(self, x, y, width, height, video_path):
+        super(Video, self).__init__(x, y, width, height, video_path)
+
+    def duration(self):
+        return float(subprocess.check_output(
+                f"ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 {self.filepath}",
+                shell=True))
+        #ffmpeg -i mov.mp4 -r 60 -f image2 image-%07d.png
+

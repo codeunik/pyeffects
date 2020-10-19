@@ -5,48 +5,58 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 import threading
 
+
 class Renderer:
-    def __init__(self, timeline, preview=True, filename="mov", save_pngs=True, save_video=False):
+    count = -1
+
+    def __init__(self, timeline, preview=True, clearall=False):
         self.timeline = timeline
         self.width = 640 if preview else 1920
         self.height = 360 if preview else 1080
         self.preview = preview
-        self.filename = filename
-        self.bool_save_pngs = save_pngs
-        self.bool_save_video = save_video and self.bool_save_pngs
+        Renderer.count += 1
+
         chrome_options = Options()
         chrome_options.add_argument("--headless")
         self.drivers = [webdriver.Chrome(chrome_options=chrome_options) for _ in range(mp.cpu_count())]
         # set viewport to be the image size
         for i in range(len(self.drivers)):
             window_size = self.drivers[i].execute_script(
-            """
-            return [window.outerWidth - window.innerWidth + arguments[0],
-              window.outerHeight - window.innerHeight + arguments[1]];
-            """, self.width, self.height)
+                """
+                return [window.outerWidth - window.innerWidth + arguments[0],
+                  window.outerHeight - window.innerHeight + arguments[1]];
+                """, self.width, self.height)
             self.drivers[i].set_window_size(*window_size)
         self.cwd = os.getcwd()
+        if clearall:
+            os.system(
+                "mkdir -p videos && rm -rf videos/* "
+                "&& mkdir -p images/svgs && rm -rf images/svgs/* "
+                "&& mkdir -p images/pngs && rm -rf images/pngs/* "
+            )
+        os.system(f"mkdir -p images/svgs/{Renderer.count} && mkdir -p images/pngs/{Renderer.count}")
 
-    def render(self):
-        os.system("mkdir -p mov && rm -rf mov/* && mkdir -p img/svg && rm -rf img/svg/* && mkdir -p img/png && rm -rf img/png/*")
+    def render_svgs(self):
         frame_number = 0
         processes = []
         while frame_number <= self.timeline._lifetime:
-            print(f"complete: {(frame_number/self.timeline._lifetime)*100:.2f}%")
-            print(f"creating frame: {frame_number}")
+            print(
+                f"creating frame: {frame_number} | completed: {(frame_number / self.timeline._lifetime) * 100:.2f}%",
+                end="\r")
             frame = Frame(self.width, self.height)
             self.timeline.exec(frame_number, frame)
-            p = mp.Process(target=frame.save, args=(f"img/svg/{frame_number}.svg",))
+
+            p = mp.Process(target=frame.save, args=(f"images/svgs/{Renderer.count}/{frame_number}.svg",))
             p.start()
             processes.append(p)
 
-            for element in frame.elements.values():
-                element.dynamic_reset()
-
-            if len(processes) == 256:
+            if len(processes) == 64:
                 for p in processes:
                     p.join()
                 processes.clear()
+
+            for element in frame.elements.values():
+                element.dynamic_reset()
 
             frame_number += 1
 
@@ -54,30 +64,46 @@ class Renderer:
             p.join()
         processes.clear()
 
-        if self.bool_save_pngs:
-            q = mp.Queue(maxsize=mp.cpu_count())
-            threads = []
-            for i in range(mp.cpu_count()):
-                q.put(i)
-            frame_number = 0
-            while frame_number <= self.timeline._lifetime:
-                if not q.empty():
-                    t = threading.Thread(target=self.save_png, args=(frame_number, q))
-                    threads.append(t)
-                    t.start()
-                    frame_number += 1
+    def render_pngs(self, remove_svgs=False):
+        if len(os.listdir(f"images/svgs/{Renderer.count}")) == 0:
+            self.render_svgs()
+        q = mp.Queue(maxsize=mp.cpu_count())
+        threads = []
+        for i in range(mp.cpu_count()):
+            q.put(i)
+        frame_number = 0
+        while frame_number < len(os.listdir(f"images/svgs/{Renderer.count}")):
+            if not q.empty():
+                t = threading.Thread(target=self._save_png, args=(frame_number, q))
+                threads.append(t)
+                t.start()
+                frame_number += 1
 
-            for t in threads:
-                t.join()
+        for t in threads:
+            t.join()
 
         for i in range(mp.cpu_count()):
             self.drivers[i].quit()
 
-        if self.bool_save_video:
-            os.system(" ".join(["cd img/png &&",
+        if remove_svgs:
+            os.system(f"rm -rf images/svgs/{Renderer.count}")
+
+    def render_video(self, filename="mov", lossless=False, remove_images=False):
+        if len(os.listdir(f"images/pngs/{Renderer.count}")) == 0:
+            self.render_pngs()
+
+        if lossless:
+            os.system(f"cd images/pngs/{Renderer.count} && "
+                      f"ffmpeg -framerate {self.timeline.fps} "
+                      f"-i %d.png -c:v copy {filename}.mkv && "
+                      f"mv {filename}.mkv ../../../videos/")
+        else:
+            os.system(" ".join([f"cd images/pngs/{Renderer.count} &&",
                                 "ffmpeg",
                                 "-y",
                                 "-vcodec", "png",
+                                "-framerate", f"{self.timeline.fps}",
+                                "-s", f"{self.width}x{self.height}",
                                 "-i", "%d.png",
                                 "-c:v", "libx264",
                                 "-crf", "0" if self.preview else "17",
@@ -85,21 +111,23 @@ class Renderer:
                                 "-pix_fmt", "yuv420p",
                                 "-an",
                                 "-tune", "animation",
-                                f"{self.filename}.mp4",
-                                f"&& mv {self.filename}.mp4 ../../mov/"]))
+                                f"{filename}.mp4",
+                                f"&& mv {filename}.mp4 ../../../videos/"]))
+        if remove_images:
+            print("ok")
+            os.system(f"rm -rf images/svgs/{Renderer.count} && rm -rf images/pngs/{Renderer.count}")
 
-    def save_png(self, frame_number, q):
+    def _save_png(self, frame_number, q):
         i = q.get()
-        self.drivers[i].get("file://"+self.cwd+f"/img/svg/{frame_number}.svg")
-        self.drivers[i].save_screenshot(self.cwd+f"/img/png/{frame_number}.png")
+        self.drivers[i].get("file://" + self.cwd + f"/images/svgs/{Renderer.count}/{frame_number}.svg")
+        self.drivers[i].save_screenshot(self.cwd + f"/images/pngs/{Renderer.count}/{frame_number}.png")
         q.put(i)
-
 
     # " DRI_PRIME=1 parallel convert '{} {.}.bmp' ::: *.svg &&"
     # " mv *.bmp ../bmps &&"
     # " cd ../bmps &&"
-    #"-vb", "20M",\
-    #"-start_number", "0",\
+    # "-vb", "20M",\
+    # "-start_number", "0",\
     # "-i", "-",\
     # "-bf", "2",\
     # "-g", "30",\
@@ -111,7 +139,7 @@ class Renderer:
     # "-crf", "18",\
     # "-preset", "ultrafast" if preview else "slower",\
 
-    #"-frames:v", f"{number_of_svgs}",\
+    # "-frames:v", f"{number_of_svgs}",\
     # "-c:a","aac",\
     # "-q:a","1",\
     # "-ac","2",\

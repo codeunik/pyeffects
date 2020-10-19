@@ -19,15 +19,8 @@ class TexConfig:
     stroke = [255, 255, 255]
     stroke_width = 1
 
-
-def use_fonts():
-    return (f"\\setmainfont{{{TexConfig.main_font}}}" if TexConfig.main_font else "")
-    +(f"\\setmonofont{{{TexConfig.mono_font}}}" if TexConfig.mono_font else "")
-    +(f"\\setsansfont{{{TexConfig.sans_font}}}" if TexConfig.sans_font else "")
-
-
 def Tex(expr):
-    filename = int(hashlib.md5(bytes(f"{expr}", encoding="utf-8")).hexdigest(), 16)
+    filename = hashlib.md5(bytes(f"{expr, TexConfig.__dict__}", encoding="utf-8")).hexdigest()
     if not os.path.exists(f"/tmp/{filename}.tex"):
         with open(f'/tmp/{filename}.tex', 'w') as f:
             f.write(f'''
@@ -38,8 +31,10 @@ def Tex(expr):
 \\usepackage{{tikz}}
 \\usepackage[a4paper, margin={TexConfig.margin}cm]{{geometry}}
 \\usepackage{{fontspec}}
-''' + use_fonts() + f'''
-\\thispagestyle{{empty}}
+''' + (f"\\setmainfont{{{TexConfig.main_font}}}" if TexConfig.main_font else "")
+    + (f"\\setmonofont{{{TexConfig.mono_font}}}" if TexConfig.mono_font else "")
+    + (f"\\setsansfont{{{TexConfig.sans_font}}}" if TexConfig.sans_font else "")
++ f'''\\thispagestyle{{empty}}
 \\begin{{document}}
 {expr}
 \\end{{document}}''')
@@ -64,7 +59,7 @@ def Tex(expr):
         y = float(use.attrs['y']) - fy
         path = Path(path)
         path.matrix(np.array([[1, 0, 0, x], [0, -1, 0, -y], [0, 0, 1, 0], [0, 0, 0, 1.0]]))
-        chars.append(path)
+        chars.add(path)
     for rect in rects:
         x = float(rect.attrs['x']) - fx
         y = float(rect.attrs['y']) - fy
@@ -72,7 +67,7 @@ def Tex(expr):
         height = float(rect.attrs['height'])
         r = Rectangle(0, 0, width, height)
         r.matrix(np.array([[1, 0, 0, x], [0, -1, 0, -y], [0, 0, 1, 0], [0, 0, 0, 1.0]]))
-        chars.append(r)
+        chars.add(r)
 
     chars.fill(TexConfig.fill).stroke(TexConfig.stroke).stroke_width(TexConfig.stroke_width)
     chars.scale(TexConfig.scale_factor, TexConfig.scale_factor)

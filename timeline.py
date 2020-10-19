@@ -155,7 +155,7 @@ class Timeline:
             anim.set_elements(elements)
             anim.set_ease(ease)
             if isinstance(anim, Tween):
-                anim.timing(start, end)
+                anim.timing(start, end, Timeline.fps)
                 self._actions.add(Scheduler(start, end), anim)
             else:
                 anim.set_timeline(self)

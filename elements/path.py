@@ -193,7 +193,7 @@ class Path(Element):
 
     def _convert_3d_to_2d(self):
         def v2c(v):
-            return complex(int(round(v[0], 0)), int(round(v[1], 0)))
+            return complex(round(v[0], 1), round(v[1], 1))
 
         self._get_transformed_points()
         camera_transformed_points = Camera._camera_view(self._transformed_points)

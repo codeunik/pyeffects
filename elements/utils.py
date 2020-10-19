@@ -1,6 +1,5 @@
 import numpy as np
 
-
 class Color:
     @staticmethod
     def hex(color):
@@ -38,3 +37,4 @@ def four_vector(v):
         else:
             v = np.hstack((v, 0.0))
     return v
+
