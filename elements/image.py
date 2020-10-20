@@ -22,7 +22,7 @@ class Image(Element):
         self.filepath = os.path.abspath(img_path)
 
     def _draw(self):
-        attr_str = f'<image x="{self.x}" y="{self.y}" width="{self.width}" height="{self.height}" href="{self.filepath}" transform="matrix{tuple(self.transform_2d())}" '
+        attr_str = f'<image x="{self.x}" y="{self.y}" width="{self.width}" height="{self.height}" href="{self.filepath}" transform="matrix(1 0 0 -1 0 1080) matrix{tuple(self.transform_2d())}" '
         attr_str += super()._draw()
         attr_str += "></image>"
         return attr_str

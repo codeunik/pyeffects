@@ -192,7 +192,7 @@ class ClipPath(Def):
         self.element = element
 
     def _str_def(self):
-        return f'<mask id="{self.id}">{self.element.draw()}</mask>'
+        return f'<clipPath id="{self.id}">{self.element._draw()}</clipPath>'
 
 
 class Mask(Def):
@@ -204,7 +204,7 @@ class Mask(Def):
         self.element = element
 
     def _str_def(self):
-        return f'<clipPath id="{self.id}">{self.element.draw()}</clipPath>'
+        return f'<mask id="{self.id}">{self.element._draw()}</mask>'
 
 
 class Gourad(Def):

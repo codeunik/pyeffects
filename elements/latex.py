@@ -29,6 +29,7 @@ def Tex(expr):
 \\usepackage{{amssymb}}
 \\usepackage{{amsfonts}}
 \\usepackage{{tikz}}
+\\usepackage[none]{{hyphenat}}
 \\usepackage[a4paper, margin={TexConfig.margin}cm]{{geometry}}
 \\usepackage{{fontspec}}
 ''' + (f"\\setmainfont{{{TexConfig.main_font}}}" if TexConfig.main_font else "")

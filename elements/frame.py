@@ -1,7 +1,7 @@
 import numpy as np
 
 from .camera import Camera
-from .defs import Def
+from .defs import Def, Mask, ClipPath
 from .element import Element
 from .group import Group
 
@@ -31,6 +31,13 @@ class Frame:
 
         return self
 
+    def _handle_defs(self, element):
+        for _type in self.def_types:
+            if isinstance(getattr(element, _type), Def):
+                self.defs.setdefault(getattr(element, _type).id, getattr(element, _type))
+                if isinstance(getattr(element, _type), Mask) or isinstance(getattr(element, _type), ClipPath):
+                    self._handle_defs(getattr(element, _type).element)
+
     def save(self, path):
         z_indexed_elements = list(self.elements.values())
         z_indexed_elements.sort(key=lambda element: element.get_z_index())
@@ -38,9 +45,7 @@ class Frame:
 
         for element in z_indexed_elements:
             svg_desc += element._draw()
-            for _type in self.def_types:
-                if isinstance(getattr(element, _type), Def):
-                    self.defs.setdefault(getattr(element, _type).id, getattr(element, _type))
+            self._handle_defs(element)
 
         svg_desc += "<defs>"
         for d in self.defs.values():
