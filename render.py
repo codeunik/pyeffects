@@ -3,7 +3,6 @@ import os
 from .elements.frame import Frame
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-import threading
 
 
 class Renderer:
@@ -18,7 +17,7 @@ class Renderer:
 
         chrome_options = Options()
         chrome_options.add_argument("--headless")
-        self.drivers = [webdriver.Chrome(chrome_options=chrome_options) for _ in range(mp.cpu_count())]
+        self.drivers = [webdriver.Chrome(chrome_options=chrome_options) for _ in range(4)]
         # set viewport to be the image size
         for i in range(len(self.drivers)):
             window_size = self.drivers[i].execute_script(
@@ -47,8 +46,8 @@ class Renderer:
             self.timeline.exec(frame_number, frame)
 
             p = mp.Process(target=frame.save, args=(f"images/svgs/{Renderer.count}/{frame_number}.svg",))
-            p.start()
             processes.append(p)
+            p.start()
 
             if len(processes) == 64:
                 for p in processes:
@@ -67,22 +66,28 @@ class Renderer:
     def render_pngs(self, remove_svgs=False):
         if len(os.listdir(f"images/svgs/{Renderer.count}")) == 0:
             self.render_svgs()
-        q = mp.Queue(maxsize=mp.cpu_count())
-        threads = []
-        for i in range(mp.cpu_count()):
+        q = mp.Queue(maxsize=len(self.drivers))
+        processes = []
+        for i in range(len(self.drivers)):
             q.put(i)
         frame_number = 0
         while frame_number < len(os.listdir(f"images/svgs/{Renderer.count}")):
             if not q.empty():
-                t = threading.Thread(target=self._save_png, args=(frame_number, q))
-                threads.append(t)
-                t.start()
+                p = mp.Process(target=self._save_png, args=(frame_number, q))
+                processes.append(p)
+                p.start()
                 frame_number += 1
 
-        for t in threads:
-            t.join()
+            if len(processes) == 128:
+                for p in processes:
+                    p.join()
+                processes.clear()
 
-        for i in range(mp.cpu_count()):
+        for p in processes:
+            p.join()
+        processes.clear()
+
+        for i in range(len(self.drivers)):
             self.drivers[i].quit()
 
         if remove_svgs:
@@ -122,6 +127,10 @@ class Renderer:
         self.drivers[i].get("file://" + self.cwd + f"/images/svgs/{Renderer.count}/{frame_number}.svg")
         self.drivers[i].save_screenshot(self.cwd + f"/images/pngs/{Renderer.count}/{frame_number}.png")
         q.put(i)
+
+    def __delete__(self):
+        for i in range(len(self.drivers)):
+            self.drivers[i].quit()
 
     # " DRI_PRIME=1 parallel convert '{} {.}.bmp' ::: *.svg &&"
     # " mv *.bmp ../bmps &&"

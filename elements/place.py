@@ -25,8 +25,8 @@ class Place:
         target_anchor = self.anchor(target, target_anchor)
 
         anchor[0] = target_anchor[0] if fix[0] else anchor[0]
-        anchor[1] = target_anchor[1] if fix[0] else anchor[1]
-        anchor[2] = target_anchor[2] if fix[0] else anchor[2]
+        anchor[1] = target_anchor[1] if fix[1] else anchor[1]
+        anchor[2] = target_anchor[2] if fix[2] else anchor[2]
         return np.array([
             target_anchor[0] - anchor[0] + offset[0],
             target_anchor[1] - anchor[1] + offset[1],

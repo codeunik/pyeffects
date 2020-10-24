@@ -1,10 +1,9 @@
 import math
 from copy import deepcopy
-from uuid import uuid4
 
-from .dynamic_data import DynamicDataIdentifier, d
+from .dynamic_data import DynamicDataIdentifier
 from .elements import Camera, Group
-from .tween import Tween, ease, translate
+from .tween import Tween, ease
 
 
 class Scheduler:
@@ -15,12 +14,9 @@ class Scheduler:
 
     def is_time(self, t):
         if 0 <= self.start <= t:
-            if t < self.end:
-                return 1
-            else:
-                return 2
+            return 1
         elif 0 <= self.at <= t:
-            if t < self.at:
+            if t == self.at:
                 return 1
             else:
                 return 2
@@ -56,6 +52,22 @@ class SetProps:
         ]
         self.prop(*self.info)
 
+class Block:
+    def __init__(self, element):
+        self.element = element
+
+    def exec(self):
+        element_id = id(self.element.get()) if isinstance(self.element, DynamicDataIdentifier) else id(self.element)
+        Timeline.blocklist[element_id] = 0
+
+class Unblock:
+    def __init__(self, element):
+        self.element = element
+
+    def exec(self):
+        element_id = id(self.element.get()) if isinstance(self.element, DynamicDataIdentifier) else id(self.element)
+        Timeline.blocklist.pop(element_id, None)
+
 
 class Actions:
     def __init__(self):
@@ -77,17 +89,9 @@ class Actions:
         self.actions.clear()
 
 
-class ElementRemover:
-    def __init__(self, element_id):
-        self.element_id = element_id
-
-    def exec(self):
-        Timeline.frame_elements.pop(self.element_id)
-
-
 class Timeline:
     fps = 24
-    frame_elements = dict()
+    blocklist = dict()
 
     def __init__(self, fps=None):
         if fps:
@@ -101,38 +105,43 @@ class Timeline:
 
     def exec(self, t, frame):
         index = 0
-        for element in Timeline.frame_elements.values():
-            frame.add(element)
         while self._actions.get_action(index):
             action_scheduler, action = self._actions.get_action(index)
             is_time = action_scheduler.is_time(t)
-            if is_time:
-                if isinstance(action, Tween):
+            if isinstance(action, Tween):
+                if is_time:
                     frame_elements = action.exec(t)
-                    if is_time == 1:
-                        for element in frame_elements:
+                    for element in frame_elements:
+                        if Timeline.blocklist.get(id(element), 1):
                             frame.add(element)
-                    else:
-                        for element in frame_elements:
-                            frame.add(element)
-                            Timeline.frame_elements.setdefault(id(element), element)
-                elif isinstance(action, Timeline):
+            elif isinstance(action, Timeline):
+                if is_time:
                     rel_time = action_scheduler.rel_time(t)
                     action.exec(rel_time, frame)
-                else:
+            elif isinstance(action, CallBack) or isinstance(action, SetProps):
+                if is_time == 1:
                     action.exec()
-
-                if is_time == 2:
+                elif is_time == 2:
                     self._actions.remove(index)
                     continue
 
             index += 1
 
-        if t == self._lifetime:
-            self._actions.clear()
 
     def add_label(self, label):
         self._labels[label] = self._cursor
+
+    def block(self, elements, delay=0, label=None, start=None):
+        self.position_cursor(start=start, delay=delay, label=label)
+        time = self._cursor
+        self._actions.add(Scheduler(at=time), Block(elements))
+        return self
+
+    def unblock(self, elements, delay=0, label=None, start=None):
+        self.position_cursor(start=start, delay=delay, label=label)
+        time = self._cursor
+        self._actions.add(Scheduler(at=time), Unblock(elements))
+        return self
 
     def add_animation(self,
                       elements,
@@ -149,7 +158,7 @@ class Timeline:
         self.position_cursor(duration=dur, end=end)
         end = self._cursor
         self._lifetime = max(self._lifetime, end)
-
+        #print(start, end)
         ease = ease if callable(ease) else ease.rate
         for anim in anims:
             anim.set_elements(elements)
@@ -162,12 +171,6 @@ class Timeline:
                 if duration is not None:
                     anim.set_duration(duration)
                 anim.exec(start)
-        return self
-
-    def remove(self, elements, delay=0, label=None, start=None):
-        self.position_cursor(start=start, delay=delay, label=label)
-        time = self._cursor
-        self._actions.add(Scheduler(at=time), ElementRemover(id(elements)))
         return self
 
     def stagger(self,
@@ -240,8 +243,8 @@ class Timeline:
             start = math.ceil(start * Timeline.fps / self._time_scale)
             self._cursor = start
         if delay:
-            delay = math.ceil(delay * Timeline.fps / self._time_scale)
-            self._cursor += delay
+            delay = math.ceil(delay * Timeline.fps / self._time_scale) if delay >= 0 else math.floor(delay * Timeline.fps / self._time_scale)
+            self._cursor = max(self._cursor + delay, 0)
 
         if duration:
             duration = math.ceil(duration * Timeline.fps / self._time_scale)

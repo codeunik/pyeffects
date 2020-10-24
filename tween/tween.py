@@ -6,6 +6,7 @@ from ..elements.group import Group
 from ..elements.utils import Color
 import os
 import hashlib
+from ..elements.image import Video
 
 class Tween:
     def __init__(self, on_update=None, kwargs_dict=None):
@@ -227,23 +228,43 @@ class draw(Tween):
         return [self.elements]
 
 class play(Tween):
-    def __init__(self, start_sec=0, speed=1, **kwargs):
-        self.start_sec = start_sec
-        self.speed = speed
+    def __init__(self, play_start_sec=0, img_seq_start_sec=0, img_seq_end_sec=-1, play_speed=1, **kwargs):
+        self.play_start_sec = play_start_sec
+        self.img_seq_start_sec = img_seq_start_sec
+        self.img_seq_end_sec = img_seq_end_sec
+        self.play_speed = play_speed
         super().__init__(**kwargs)
 
     def update(self, rel_frame_number):
+        assert isinstance(self.elements, Video)
         if rel_frame_number == 0:
-            video_duration = self.speed * (self.end_frame - self.start_frame)/self.fps
-            video_fps = self.fps / self.speed
-            self.file_hash = hashlib.md5(
-                bytes(f"{self.elements.filepath, self.start_sec, self.speed, video_duration}", encoding="utf-8")).hexdigest()
-            # ffmpeg -i mov.mp4 -r 60 -f image2 image-%07d.png
-            os.system(f'mkdir -p /tmp/{self.file_hash} '
-                      + f'&& ffmpeg -ss {self.start_sec} -i {self.elements.filepath} -t {video_duration}'
-                      + f'-r {video_fps} -f image2 /tmp/{self.file_hash}/%d.png')
+            #play_duration = self.play_speed * (self.end_frame - self.start_frame) / self.fps
+            play_fps = self.fps / self.play_speed
+            self.play_start_frame = int(self.play_start_sec * play_fps)
+            self.img_seq_end_sec = self.elements.duration() if self.img_seq_end_sec <=0 or self.img_seq_end_sec > self.elements.duration() else self.img_seq_end_sec
+            self.file_hash = hashlib.md5(bytes(f"{self.elements.filepath}", encoding="utf-8")).hexdigest()
 
-        self.elements.set_image(f'/tmp/{self.file_hash}/{rel_frame_number+1}.png')
+            os.system(f"mkdir -p /tmp/img_seq/{self.file_hash} && touch /tmp/img_seq/{self.file_hash}/info.txt")
+            with open(f"/tmp/img_seq/{self.file_hash}/info.txt", "r") as f:
+                info = f.read().strip("\n")
+            if not info:
+                with open(f"/tmp/img_seq/{self.file_hash}/info.txt", "w") as f:
+                    f.write(f"{self.img_seq_start_sec},{self.img_seq_end_sec},{play_fps}")
+
+                os.system(f'ffmpeg -ss {self.img_seq_start_sec} -i {self.elements.filepath} -t {self.img_seq_end_sec} '
+                          + f'-r {play_fps} -f image2 /tmp/img_seq/{self.file_hash}/%d.png')
+            else:
+                isss, ises, pf = [float(s) for s in info.split(',')]
+                if not (isss <= self.img_seq_start_sec <= self.img_seq_end_sec <= ises and pf == play_fps):
+                    with open(f"/tmp/img_seq/{self.file_hash}/info.txt", "w") as f:
+                        f.write(f"{self.img_seq_start_sec},{self.img_seq_end_sec},{play_fps}")
+
+                    # ffmpeg -i mov.mp4 -r 60 -f image2 image-%07d.png
+                    os.system(f'ffmpeg -ss {self.img_seq_start_sec} -i {self.elements.filepath} -t {self.img_seq_end_sec} '
+                              + f'-r {play_fps} -f image2 /tmp/img_seq/{self.file_hash}/%d.png')
+            self.total_frame_count = len(os.listdir(f'/tmp/img_seq/{self.file_hash}')) - 1
+        nth_img = ((rel_frame_number+self.play_start_frame)%self.total_frame_count)+1
+        self.elements.set_image(f'/tmp/img_seq/{self.file_hash}/{nth_img}.png')
         return [self.elements]
 
 class camera_position(Common):

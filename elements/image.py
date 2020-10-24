@@ -4,12 +4,13 @@ from .element import Element
 import subprocess
 
 class Image(Element):
-    def __init__(self, x, y, width, height, img_path):
+    def __init__(self, x, y, width, height, img_path, preserve_aspect_ratio="xMidYMid slice"):
         self.x = x
         self.y = y
         self.width = width
         self.height = height
         self.filepath = os.path.abspath(img_path)
+        self.preserve_aspect_ration = preserve_aspect_ratio
         Element.__init__(self)
 
     def set_dimension(self, x=None, y=None, width=None, height=None):
@@ -22,7 +23,8 @@ class Image(Element):
         self.filepath = os.path.abspath(img_path)
 
     def _draw(self):
-        attr_str = f'<image x="{self.x}" y="{self.y}" width="{self.width}" height="{self.height}" href="{self.filepath}" transform="matrix(1 0 0 -1 0 1080) matrix{tuple(self.transform_2d())}" '
+        attr_str = f'<image x="{self.x}" y="{self.y}" width="{self.width}" height="{self.height}" href="{self.filepath}"' \
+                   f' transform="matrix(1 0 0 -1 0 1080) matrix{tuple(self.transform_2d())}" preserveAspectRatio="{self.preserve_aspect_ration}" '
         attr_str += super()._draw()
         attr_str += "></image>"
         return attr_str
@@ -57,8 +59,8 @@ class Image(Element):
 
 
 class Video(Image):
-    def __init__(self, x, y, width, height, video_path):
-        super(Video, self).__init__(x, y, width, height, video_path)
+    def __init__(self, x, y, width, height, video_path, preserve_aspect_ratio="xMidYMid slice"):
+        super(Video, self).__init__(x, y, width, height, video_path, preserve_aspect_ratio)
 
     def duration(self):
         return float(subprocess.check_output(

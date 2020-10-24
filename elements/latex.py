@@ -19,8 +19,16 @@ class TexConfig:
     stroke = [255, 255, 255]
     stroke_width = 1
 
+    @staticmethod
+    def text_box(width=None, scale_factor=None, margin=None):
+        TexConfig.margin = round((594.691842 - (width/scale_factor)) / 56.76466 if width and scale_factor \
+                            else TexConfig.margin if margin is None else margin, 2)
+        TexConfig.scale_factor = round(width / (594.691842 - margin * 56.76466) if width and margin \
+                                else TexConfig.scale_factor if scale_factor is None else scale_factor, 2)
+
+
 def Tex(expr):
-    filename = hashlib.md5(bytes(f"{expr, TexConfig.__dict__}", encoding="utf-8")).hexdigest()
+    filename = hashlib.md5(bytes(f"{expr, TexConfig.main_font, TexConfig.mono_font, TexConfig.sans_font, TexConfig.margin}", encoding="utf-8")).hexdigest()
     if not os.path.exists(f"/tmp/{filename}.tex"):
         with open(f'/tmp/{filename}.tex', 'w') as f:
             f.write(f'''
@@ -40,7 +48,7 @@ def Tex(expr):
 {expr}
 \\end{{document}}''')
 
-        os.system(f"cd /tmp && xelatex -no-pdf {filename}.tex && dvisvgm -e -n {filename}.xdv")
+        os.system(f"cd /tmp && xelatex -no-pdf {filename}.tex > /dev/null 2>&1 && dvisvgm -e -n {filename}.xdv > /dev/null 2>&1")
 
     with open(f'/tmp/{filename}.svg', 'r') as f:
         soup = bs4.BeautifulSoup(f, 'xml')
