@@ -6,15 +6,10 @@ from .element import Element
 from .group import Group
 
 
-class FrameConfig:
-    width = 1920
-    height = 1080
-
-
 class Frame:
     def_types = ["_fill", "_stroke", "_filter", "_clip_path", "_mask"]
 
-    def __init__(self, width=FrameConfig.width, height=FrameConfig.height):
+    def __init__(self, width, height):
         self._header = f'''<svg width="{width}" height="{height}" version="1.1" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g transform="matrix(1, 0, 0, -1, 0, 1080)">'''
         self.groups = dict()
         self.elements = dict()
@@ -58,11 +53,15 @@ class Frame:
         with open(path, "w") as f:
             f.write(svg_desc)
 
+class FrameConfig:
+    width = 1920
+    height = 1080
+
 class Scene:
     count = 1
 
     def __init__(self, *elements):
-        frame = Frame()
+        frame = Frame(FrameConfig.width, FrameConfig.height)
         for element in elements:
             frame.add(element)
         frame.save(f"scene{Scene.count}.svg")
