@@ -1,30 +1,31 @@
 import numpy as np
 
 class Color:
-    @staticmethod
-    def hex(color):
-        if len(color) == 7:
-            return np.array([int(color[i:i + 2], 16)/255.0 for i in (1, 3, 5)], dtype=np.int)
-        else:
-            return np.array([int(c * 2, 16)/255.0 for c in color[1:]], dtype=np.int)
+    def __init__(self, hsv=None, rgb=None):
+        # in the range (0,0,0) - (1,1,1)
+        if hsv is not None:
+            self.specification = 'hsv'
+            self.value = np.array(hsv)
+        elif rgb is not None:
+            self.specification = 'rgb'
+            self.value = np.array(rgb)
 
-    @staticmethod
-    def rgb255(color):
-        return np.array(color)/255.0
+    # @staticmethod
+    # def hex(color):
+    #     if len(color) == 7:
+    #         return np.array([int(color[i:i + 2], 16)/255.0 for i in (1, 3, 5)], dtype=int)
+    #     else:
+    #         return np.array([int(c * 2, 16)/255.0 for c in color[1:]], dtype=int)
 
-    @staticmethod
-    def rgb1(color):
-        return np.array(color)
-
-    @staticmethod
-    def to_hex(color):
-        color *= 255
-        rgb = color.astype(int)
-        return "#{0:02x}{1:02x}{2:02x}".format(*rgb)
+    # @staticmethod
+    # def to_hex(color):
+    #     color *= 255
+    #     rgb = color.astype(int)
+    #     return "#{0:02x}{1:02x}{2:02x}".format(*rgb)
 
 
 def unit_vector(v):
-    v = np.array(v, dtype=np.float)
+    v = np.array(v, dtype=float)
     v[:3] = v[:3] / np.linalg.norm(v[:3])
     return v
 

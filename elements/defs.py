@@ -1,5 +1,5 @@
 from .utils import Color
-
+from .group import Group
 
 class Def:
     pass
@@ -186,25 +186,25 @@ class RadialGradient(Def):
 class ClipPath(Def):
     _count = 0
 
-    def __init__(self, element):
+    def __init__(self, elements):
         self.id = f"cp{ClipPath._count}"
         ClipPath._count += 1
-        self.element = element
+        self.elements = elements
 
     def _str_def(self):
-        return f'<clipPath id="{self.id}">{self.element._draw()}</clipPath>'
+        return f'<clipPath id="{self.id}">{" ".join(element._draw() for element in self.elements)}</clipPath>'
 
 
 class Mask(Def):
     _count = 0
 
-    def __init__(self, element):
+    def __init__(self, *elements):
         self.id = f"m{Mask._count}"
         Mask._count += 1
-        self.element = element
+        self.elements = Group(*elements)
 
     def _str_def(self):
-        return f'<mask id="{self.id}">{self.element._draw()}</mask>'
+        return f'<mask id="{self.id}">{" ".join(element._draw() for element in self.elements)}</mask>'
 
 
 class Gourad(Def):

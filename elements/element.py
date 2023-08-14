@@ -1,8 +1,8 @@
 from copy import deepcopy
-
+import colorsys
 import numpy as np
 
-from .defs import ClipPath, LinearGradient, Mask, RadialGradient
+# from .defs import LinearGradient, RadialGradient
 from .place import Place
 from .transform import Transform
 from .utils import Color
@@ -33,13 +33,14 @@ class Element(Transform, Place):
         self._mask = "nil"
         self._filter = "nil"
         self._z_index = None
+        self.additional_data = dict()
 
         Transform.__init__(self)
 
     def _draw(self):
         attr_str = ""
         for attr in Element.attrs:
-            if getattr(self, attr) != "nil":
+            if getattr(self, attr) is not "nil":
                 attr_str += getattr(self, f"_str{attr}")() + " "
 
         return attr_str
@@ -52,25 +53,21 @@ class Element(Transform, Place):
         return self
 
     def stroke(self, color):
-        if isinstance(color, LinearGradient):
-            self._stroke = color
-        elif isinstance(color, RadialGradient):
-            self._stroke = color
-        elif isinstance(color, list) or isinstance(color, tuple):
-            self._stroke = Color.rgb255(color)
-        else:
-            self._stroke = color
+        # if isinstance(color, LinearGradient):
+        #     self._stroke = color
+        # elif isinstance(color, RadialGradient):
+        #     self._stroke = color
+        # else:
+        self._stroke = color
         return self
 
     def fill(self, color):
-        if isinstance(color, LinearGradient):
-            self._fill = color
-        elif isinstance(color, RadialGradient):
-            self._fill = color
-        elif isinstance(color, list) or isinstance(color, tuple):
-            self._fill = Color.rgb255(color)
-        else:
-            self._fill = color
+        # if isinstance(color, LinearGradient):
+        #     self._fill = color
+        # elif isinstance(color, RadialGradient):
+        #     self._fill = color
+        # else:
+        self._fill = color
         return self
 
     def stroke_width(self, stroke_width):
@@ -176,21 +173,23 @@ class Element(Transform, Place):
     def _str_color(self, color):
         if type(color) == str:
             return color
-        else:
-            return f"rgb{tuple(color*255)}"
+        elif color.specification == 'hsv':
+            return f"rgb{tuple((np.array(colorsys.hsv_to_rgb(*color.value))*255).astype(int))}"
+        elif color.specification == 'rgb':
+            return f"rgb{tuple((color.value*255).astype(int))}"
 
     def _str_stroke(self):
-        if isinstance(self._stroke, LinearGradient):
-            return f'stroke="url(#{self._stroke.id})"'
-        elif isinstance(self._stroke, RadialGradient):
-            return f'stroke="url(#{self._stroke.id})"'
+        # if isinstance(self._stroke, LinearGradient):
+        #     return f'stroke="url(#{self._stroke.id})"'
+        # elif isinstance(self._stroke, RadialGradient):
+        #     return f'stroke="url(#{self._stroke.id})"'
         return f'stroke="{self._str_color(self._stroke)}"'
 
     def _str_fill(self):
-        if isinstance(self._fill, LinearGradient):
-            return f'fill="url(#{self._fill.id})"'
-        elif isinstance(self._fill, RadialGradient):
-            return f'fill="url(#{self._fill.id})"'
+        # if isinstance(self._fill, LinearGradient):
+        #     return f'fill="url(#{self._fill.id})"'
+        # elif isinstance(self._fill, RadialGradient):
+        #     return f'fill="url(#{self._fill.id})"'
         return f'fill="{self._str_color(self._fill)}"'
 
     def _str_stroke_width(self):
@@ -212,7 +211,7 @@ class Element(Transform, Place):
         return f'stroke-linejoin="{self._stroke_linejoin}"'
 
     def _str_stroke_dasharray(self):
-        border_len = self._border_length()
+        border_len = self.border_length()
         stroke_dasharray = self._stroke_dasharray * border_len
         return f'stroke-dasharray=\"{" ".join(str(x) for x in stroke_dasharray)}\"'
 
@@ -223,7 +222,7 @@ class Element(Transform, Place):
         return f'stroke-miterlimit="{self._stroke_miterlimit}"'
 
     def _str_stroke_dashoffset(self):
-        border_len = self._border_length()
+        border_len = self.border_length()
         return f'stroke-dashoffset="{self._stroke_dashoffset * border_len}"'
 
     def _str_clip_path(self):

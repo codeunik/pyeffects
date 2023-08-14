@@ -8,10 +8,10 @@ from .defs import LinearGradient, RadialGradient, Gourad
 from .element import Element
 from .group import Group
 from .light import Light
-from .svgpathtools import Path as SVGPath
-from .svgpathtools import Arc, CubicBezier, Line, parse_path
+from svgpathtools import Path as SVGPath
+from svgpathtools import Arc, CubicBezier, Line, parse_path
 from .utils import unit_vector
-
+from copy import deepcopy
 
 class Path(Element):
     def __init__(self, data=None, shading_type=None):
@@ -31,6 +31,7 @@ class Path(Element):
         self._transformed_points = None
         self._vertex_avg = None
         self._data_2d = self._get_svg_path(data)
+        self.path = self._data_2d
         self._convert_2d_to_3d()
         self._create_bbox()
         return self
@@ -54,6 +55,24 @@ class Path(Element):
         self._convert_2d_to_3d()
         self._create_bbox()
         return self
+    
+    def point(self, t):
+        self._convert_3d_to_2d()
+        point = self._data_2d.point(t)
+        return np.array([point.real, point.imag])
+
+    def border_length(self):
+        self._convert_3d_to_2d()
+        return self._data_2d.length()
+
+    def continuous_subpaths(self):
+        continuous_subpaths = []
+        # self._convert_3d_to_2d()
+        for cp in self._data_2d.continuous_subpaths():
+            path = deepcopy(self)
+            continuous_subpaths.append(path.set_segments(cp))
+        
+        return Group(*continuous_subpaths)
 
     def modify_segments(self, indicies, modified_segments):
         assert len(indicies) == len(modified_segments)
@@ -130,10 +149,6 @@ class Path(Element):
     def _get_vertex_avg(self):
         self._get_transformed_points()
         self._vertex_avg = sum(self._transformed_points[:-1]) / (len(self._transformed_points) - 1)
-
-    def _border_length(self):
-        self._convert_3d_to_2d()
-        return self._data_2d.length()
 
     def _str_fill(self):
         if self._shading_type:
@@ -233,7 +248,7 @@ class Path(Element):
                     self._data_2d[comp_index].end = p
 
         self._create_bbox()
-        self.static = np.eye(4, dtype=np.float)
+        self.static = np.eye(4, dtype=float)
         return self
 
     def _get_svg_path(self, data):

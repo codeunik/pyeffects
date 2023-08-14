@@ -5,7 +5,6 @@ import numpy as np
 from .element import Element
 from .place import Place
 
-
 class Group(list, Place):
     def __init__(self, *group):
         list.__init__(self)
@@ -23,8 +22,16 @@ class Group(list, Place):
         for item in target:
             if isinstance(item, Element):
                 yield item
-            else:
+            elif isinstance(item, Group):
                 yield from Group._flatten(item)
+
+    def continuous_subpaths(self):
+        continuous_subpaths = []
+        for element in self:
+            continuous_subpaths.append(element.continuous_subpaths())
+        
+        return Group(*continuous_subpaths)
+
 
     def bbox(self):
         x_min_list = []
@@ -41,15 +48,22 @@ class Group(list, Place):
             x_max_list.append(element_bbox[1][0])
             y_max_list.append(element_bbox[1][1])
             z_max_list.append(element_bbox[1][2])
+        
         group_x_min = min(x_min_list)
         group_y_min = min(y_min_list)
         group_z_min = min(z_min_list)
         group_x_max = max(x_max_list)
         group_y_max = max(y_max_list)
         group_z_max = max(z_max_list)
-
+        
         return np.array([[group_x_min, group_y_min, group_z_min, 1.0],
                          [group_x_max, group_y_max, group_z_max, 1.0]])
+
+    def anchor_point(self, anchor=[0.5, 0.5]):
+        bbox = self.bbox()
+        anchor2 = np.ones(4)
+        anchor2[:len(anchor)] = anchor
+        return (bbox[0] * (1 - anchor2) + anchor2 * bbox[1])[:len(anchor)] 
 
     def center(self):
         return self.bbox().sum(axis=0) / 2

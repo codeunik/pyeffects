@@ -5,8 +5,8 @@ import numpy as np
 
 class Transform:
     def __init__(self):
-        self.dynamic = np.eye(4, dtype=np.float)
-        self.static = np.eye(4, dtype=np.float)
+        self.dynamic = np.eye(4, dtype=float)
+        self.static = np.eye(4, dtype=float)
         self.dynamic_to_static = dict()
 
     def transform_3d(self):
@@ -23,7 +23,7 @@ class Transform:
         return [a00, a10, a01, a11, a02, a12]
 
     def reset(self):
-        self.static = np.eye(4, dtype=np.float)
+        self.static = np.eye(4, dtype=float)
         return self
 
     def translate(self, x=0, y=0, z=0):
@@ -55,7 +55,7 @@ class Transform:
         return self
 
     def dynamic_reset(self):
-        self.dynamic = np.eye(4, dtype=np.float)
+        self.dynamic = np.eye(4, dtype=float)
         return self
 
     def dynamic_translate(self, x=0, y=0, z=0):
@@ -101,6 +101,12 @@ class Transform:
         z_max = bbox[:, 2].max()
         return np.array([[x_min, y_min, z_min, 1.0],
                          [x_max, y_max, z_max, 1.0]])
+
+    def anchor_point(self, anchor=[0.5, 0.5]):
+        bbox = self.bbox()
+        anchor2 = np.ones(4)
+        anchor2[:len(anchor)] = anchor
+        return (bbox[0] * (1 - anchor2) + anchor2 * bbox[1])[:len(anchor)] 
 
     def center(self):
         return self.bbox().sum(axis=0) / 2

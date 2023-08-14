@@ -1,9 +1,12 @@
 import multiprocessing as mp
+import subprocess as sp
 import os
-from .elements.frame import Frame
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-
+# from wand.image import Image
+# import cairosvg
+from .elements.place import Place
+from pyeffects import g, b, Frame
+import tempfile
+import pandas as pd
 
 class Renderer:
     count = -1
@@ -13,124 +16,174 @@ class Renderer:
         self.width = 640 if preview else 1920
         self.height = 360 if preview else 1080
         self.preview = preview
+        self.ffmpeg_bin = '/usr/bin/ffmpeg'
         Renderer.count += 1
-
-        chrome_options = Options()
-        chrome_options.add_argument("--headless")
-        self.drivers = [webdriver.Chrome(chrome_options=chrome_options) for _ in range(4)]
-        # set viewport to be the image size
-        for i in range(len(self.drivers)):
-            window_size = self.drivers[i].execute_script(
-                """
-                return [window.outerWidth - window.innerWidth + arguments[0],
-                  window.outerHeight - window.innerHeight + arguments[1]];
-                """, self.width, self.height)
-            self.drivers[i].set_window_size(*window_size)
-        self.cwd = os.getcwd()
+        os.system("mkdir -p videos && mkdir -p svgs && mkdir -p pngs")
         if clearall:
             os.system(
-                "mkdir -p videos && rm -rf videos/* "
-                "&& mkdir -p images/svgs && rm -rf images/svgs/* "
-                "&& mkdir -p images/pngs && rm -rf images/pngs/* "
+                "rm -rf videos/* && rm -rf svgs/* && rm -rf pngs/*"
             )
-        os.system(f"mkdir -p images/svgs/{Renderer.count} && mkdir -p images/pngs/{Renderer.count}")
+        os.system(f"mkdir -p svgs/{Renderer.count} && mkdir -p pngs/{Renderer.count}")
 
-    def render_svgs(self):
+    def render_video(self, filename="mov", video=False, save_frames={-1:True}, png=1, svg=0):
+        if video:
+            command = [
+                    self.ffmpeg_bin,
+                    '-y',
+                    '-f', 'image2pipe',
+                    '-r', f'{self.timeline.fps}', # frames per second
+                    '-pix_fmt', 'rgba',
+                    "-s", f"{self.width}x{self.height}",
+                    '-i', '-', # The imput comes from a pipe
+                    '-an', # Tells FFMPEG not to expect any audio
+                    '-vcodec', 'libx264',
+                    '-pix_fmt', 'yuv420p',
+                    "-loglevel", "error",
+                    f'videos/{filename}_{Renderer.count}.mp4'
+                ]
+            pipe = sp.Popen(command, stdin=sp.PIPE)
+        
+
         frame_number = 0
-        processes = []
         while frame_number <= self.timeline._lifetime:
             print(
                 f"creating frame: {frame_number} | completed: {(frame_number / self.timeline._lifetime) * 100:.2f}%",
                 end="\r")
             frame = Frame(self.width, self.height)
-            self.timeline.exec(frame_number, frame)
+            self.timeline.exec(frame_number)
 
-            p = mp.Process(target=frame.save, args=(f"images/svgs/{Renderer.count}/{frame_number}.svg",))
-            processes.append(p)
-            p.start()
+            for k, v in pd.json_normalize(g, sep='.').to_dict(orient='records')[0].items():
+                if issubclass(type(v), Place):
+                    if v not in b.values():
+                        frame.add(v)
 
-            if len(processes) == 64:
-                for p in processes:
-                    p.join()
-                processes.clear()
+            svg_data = frame.generate().encode()
+            if video:
+                convert_svg_2_png = sp.Popen(
+                    ['convert', 'svg:-', 'png:-'],
+                    stdin=sp.PIPE,
+                    stdout=sp.PIPE,
+                    stderr=sp.PIPE,
+                    # encoding='utf-8'
+                )
+                png_data, error_message = convert_svg_2_png.communicate(input=svg_data)
+                pipe.stdin.write(png_data)
+            elif png:
+                p = mp.Process(target=self.parallel_svg2png, args=(svg_data, frame_number))
+                p.start()
+
+            # with io.StringIO() as svg_file:
+            #     svg_file.write(frame.generate())
+            # with tempfile.NamedTemporaryFile() as tmp_svg_file:
+            #     tmp_svg_file.write(frame.generate().encode())
+                    # with Image(blob=frame.generate().encode()) as img:
+                    #     img.format = 'png'
+                    #     img.save(pipe.stdin)
+            # pipe.stdin.write(frame.generate().encode())
+
+            # cairosvg.svg2png(frame.generate(), unsafe=True, write_to=pipe.stdin)
+
+            if svg:
+                if save_frames.get(-1):
+                    frame.save(f'svgs/{Renderer.count}/{str(frame_number).zfill(8)}.svg')
+                elif save_frames.get(frame_number, False):
+                    frame.save(f'svgs/{Renderer.count}/{frame_number}.svg')
 
             for element in frame.elements.values():
                 element.dynamic_reset()
+                try:
+                    for element in element.get_mask().elements:
+                        element.dynamic_reset()
+                except:
+                    pass
 
             frame_number += 1
 
-        for p in processes:
-            p.join()
-        processes.clear()
+        if video:
+            pipe.stdin.close()
+            pipe.wait()
+            pipe.terminate()
 
-    def render_pngs(self, remove_svgs=False):
-        if len(os.listdir(f"images/svgs/{Renderer.count}")) == 0:
-            self.render_svgs()
-        q = mp.Queue(maxsize=len(self.drivers))
-        processes = []
-        for i in range(len(self.drivers)):
-            q.put(i)
-        frame_number = 0
-        while frame_number < len(os.listdir(f"images/svgs/{Renderer.count}")):
-            if not q.empty():
-                p = mp.Process(target=self._save_png, args=(frame_number, q))
-                processes.append(p)
-                p.start()
-                frame_number += 1
+    def parallel_svg2png(self, svg_data, frame_number):
+        convert_svg_2_png = sp.Popen(
+            ['convert', 'svg:-', 'png:-'],
+            stdin=sp.PIPE,
+            stdout=sp.PIPE,
+            stderr=sp.PIPE,
+            # encoding='utf-8'
+        )
+        
+        png_data, error_message = convert_svg_2_png.communicate(input=svg_data)
 
-            if len(processes) == 128:
-                for p in processes:
-                    p.join()
-                processes.clear()
+        with open(f'pngs/{Renderer.count}/{str(frame_number).zfill(8)}.png', 'wb') as f:
+            f.write(png_data)
 
-        for p in processes:
-            p.join()
-        processes.clear()
 
-        for i in range(len(self.drivers)):
-            self.drivers[i].quit()
 
-        if remove_svgs:
-            os.system(f"rm -rf images/svgs/{Renderer.count}")
+    # def render_video(self, filename="mov", lossless=False, remove_images=False):
+    #     #if len(os.listdir(f"svgs/{Renderer.count}")) == 0:
+    #     self.render_svgs()
+    #     os.system(f'cd svgs/{Renderer.count} && mv **/* . ')
+    #     os.system(f'cd svgs/{Renderer.count} && rm -r */')
+        
+    #     if lossless:
+    #         os.system(f"cd svgs/{Renderer.count} && "
+    #                   f"{self.ffmpeg} -framerate {self.timeline.fps} "
+    #                   f"-i %d.svg -c:v copy {filename}.mkv && "
+    #                   f"mv {filename}.mkv ../../videos/")
+    #     else:
+    #         os.system(" ".join([f"cd svgs/{Renderer.count} &&",
+    #                             self.ffmpeg,
+    #                             "-y",
+    #                             #"-vcodec", "png",
+    #                             "-framerate", f"{self.timeline.fps}",
+    #                             "-s", f"{self.width}x{self.height}",
+    #                             "-i", "%d.svg",
+    #                             "-c:v", "libx264",
+    #                             "-crf", "0" if self.preview else "17",
+    #                             "-preset", "ultrafast" if self.preview else "slower",
+    #                             "-pix_fmt", "yuv420p",
+    #                             "-an",
+    #                             "-tune", "animation",
+    #                             f"{filename}.mp4",
+    #                             f"&& mv {filename}.mp4 ../../videos/"]))
+    #     if remove_images:
+    #         os.system(f"rm -rf svgs/{Renderer.count}")
 
-    def render_video(self, filename="mov", lossless=False, remove_images=False):
-        if len(os.listdir(f"images/pngs/{Renderer.count}")) == 0:
-            self.render_pngs()
 
-        if lossless:
-            os.system(f"cd images/pngs/{Renderer.count} && "
-                      f"ffmpeg -framerate {self.timeline.fps} "
-                      f"-i %d.png -c:v copy {filename}.mkv && "
-                      f"mv {filename}.mkv ../../../videos/")
-        else:
-            os.system(" ".join([f"cd images/pngs/{Renderer.count} &&",
-                                "ffmpeg",
-                                "-y",
-                                "-vcodec", "png",
-                                "-framerate", f"{self.timeline.fps}",
-                                "-s", f"{self.width}x{self.height}",
-                                "-i", "%d.png",
-                                "-c:v", "libx264",
-                                "-crf", "0" if self.preview else "17",
-                                "-preset", "ultrafast" if self.preview else "slower",
-                                "-pix_fmt", "yuv420p",
-                                "-an",
-                                "-tune", "animation",
-                                f"{filename}.mp4",
-                                f"&& mv {filename}.mp4 ../../../videos/"]))
-        if remove_images:
-            print("ok")
-            os.system(f"rm -rf images/svgs/{Renderer.count} && rm -rf images/pngs/{Renderer.count}")
 
-    def _save_png(self, frame_number, q):
-        i = q.get()
-        self.drivers[i].get("file://" + self.cwd + f"/images/svgs/{Renderer.count}/{frame_number}.svg")
-        self.drivers[i].save_screenshot(self.cwd + f"/images/pngs/{Renderer.count}/{frame_number}.png")
-        q.put(i)
 
-    def __delete__(self):
-        for i in range(len(self.drivers)):
-            self.drivers[i].quit()
+    # def render_svgs(self):
+    #     frame_number = 0
+    #     processes = []
+    #     while frame_number <= self.timeline._lifetime:
+    #         print(
+    #             f"creating frame: {frame_number} | completed: {(frame_number / self.timeline._lifetime) * 100:.2f}%",
+    #             end="\r")
+    #         frame = Frame(self.width, self.height)
+    #         self.timeline.exec(frame_number, frame)
+
+    #         dir = str(frame_number)[:-2]
+    #         os.system(f"mkdir -p svgs/{Renderer.count}/{dir if dir else '0'}")
+    #         p = mp.Process(target=frame.save, args=(f"svgs/{Renderer.count}/{dir if dir else '0'}/{frame_number}.svg",))
+    #         processes.append(p)
+    #         p.start()
+
+    #         if len(processes) == 256:
+    #             for p in processes:
+    #                 p.join()
+    #             processes.clear()
+                
+    #         for element in frame.elements.values():
+    #             element.dynamic_reset()
+
+    #         frame_number += 1
+
+    #     for p in processes:
+    #         p.join()
+    #     processes.clear()
+
+
 
     # " DRI_PRIME=1 parallel convert '{} {.}.bmp' ::: *.svg &&"
     # " mv *.bmp ../bmps &&"

@@ -1,7 +1,7 @@
 import math
 
 from .path import Path
-from .svgpathtools import parse_path
+from svgpathtools import parse_path
 
 
 def Rectangle(x, y, width, height, rx=0, ry=0):

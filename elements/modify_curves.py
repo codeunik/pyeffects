@@ -1,5 +1,5 @@
 from .arc2bezier import _arc2bezier
-from .svgpathtools import Arc, CubicBezier, Line, QuadraticBezier
+from svgpathtools import Arc, CubicBezier, Line, QuadraticBezier
 
 
 def _split_bezier(curve, r):

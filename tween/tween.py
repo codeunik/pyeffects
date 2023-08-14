@@ -1,6 +1,5 @@
 import numpy as np
 
-from ..dynamic_data import DynamicDataIdentifier
 from ..elements.element import Element
 from ..elements.group import Group
 from ..elements.utils import Color
@@ -9,15 +8,16 @@ import hashlib
 from ..elements.image import Video
 
 class Tween:
-    def __init__(self, on_update=None, kwargs_dict=None):
+    def __init__(self, before_update=None, before_update_kwargs=dict(), after_update=None, after_update_kwargs=dict()):
 
-        self.on_update = on_update
-        self.on_update_kwargs = kwargs_dict
+        self.before_update = before_update
+        self.after_update = after_update
+        self.before_update_kwargs = before_update_kwargs
+        self.after_update_kwargs = after_update_kwargs
 
         self.start_frame = 0
         self.end_frame = -1
         self.fps = None
-        self.dynamic_data_flag = 1
 
     def set_elements(self, elements):
         self.elements = elements
@@ -26,27 +26,34 @@ class Tween:
         self.ease = ease
 
     def exec(self, frame_number):
-        if self.dynamic_data_flag:
-            for var in dir(self):
-                if isinstance(getattr(self, var), DynamicDataIdentifier):
-                    setattr(self, var, getattr(self, var).get())
-            self.dynamic_data_flag = 0
+        self.frame_number = frame_number
+        if self.before_update:
+            self.before_update(self, **self.before_update_kwargs)
+        self.update()
+        if self.after_update:
+            self.after_update(self, **self.after_update_kwargs)
 
-        if self.on_update:
-            self.on_update(self, **self.on_update_kwargs)
+    def update(self):
+        pass
 
-        return self.update(self.rel_frame_number(frame_number))
+    @property
+    def rel_frame_number(self):
+        return self.frame_number - self.start_frame
 
-    def update(self, rel_frame_number):
-        return [self.elements]
-
-    def rel_frame_number(self, frame_number):
-        return frame_number - self.start_frame
-
-    def progress(self, rel_frame_number):
+    @property
+    def t(self):
         if self.start_frame == self.end_frame:
             return 1
-        return rel_frame_number / (self.end_frame - self.start_frame)
+        return self.rel_frame_number / (self.end_frame - self.start_frame)
+
+    @property
+    def et(self):
+        return self.ease(self.t)
+
+    @property
+    def dt(self):
+        return 1 / (self.end_frame - self.start_frame)
+
 
     def timing(self, start_frame, end_frame, fps):
         self.start_frame = start_frame
@@ -61,14 +68,11 @@ class translate(Tween):
         self.z = z
         super().__init__(**kwargs)
 
-    def update(self, rel_frame_number):
-        t = self.progress(rel_frame_number)
-        et = self.ease(t)
-        if t == 1:
-            self.elements.translate(et * self.x, et * self.y, et * self.z)
+    def update(self):
+        if self.t == 1:
+            self.elements.translate(self.et * self.x, self.et * self.y, self.et * self.z)
         else:
-            self.elements.dynamic_translate(et * self.x, et * self.y, et * self.z)
-        return [self.elements]
+            self.elements.dynamic_translate(self.et * self.x, self.et * self.y, self.et * self.z)
 
 
 class x(translate):
@@ -94,16 +98,13 @@ class scale(Tween):
         self.anchor = anchor[:]
         super().__init__(**kwargs)
 
-    def update(self, rel_frame_number):
-        t = self.progress(rel_frame_number)
-        et = self.ease(t)
-        if t == 1:
-            self.elements.scale(1 + et * (self.sx - 1), 1 + et * (self.sy - 1),
-                                1 + et * (self.sz - 1), self.anchor)
+    def update(self):
+        if self.t == 1:
+            self.elements.scale(1 + self.et * (self.sx - 1), 1 + self.et * (self.sy - 1),
+                                1 + self.et * (self.sz - 1), self.anchor)
         else:
-            self.elements.dynamic_scale(1 + et * (self.sx - 1), 1 + et * (self.sy - 1),
-                                        1 + et * (self.sz - 1), self.anchor)
-        return [self.elements]
+            self.elements.dynamic_scale(1 + self.et * (self.sx - 1), 1 + self.et * (self.sy - 1),
+                                        1 + self.et * (self.sz - 1), self.anchor)
 
 
 class sx(scale):
@@ -128,91 +129,82 @@ class rotate(Tween):
         self.anchor = anchor[:]
         super().__init__(**kwargs)
 
-    def update(self, rel_frame_number):
-        t = self.progress(rel_frame_number)
-        et = self.ease(t)
-        if t == 1:
-            self.elements.rotate(et * self.angle, self.axis, self.anchor)
+    def update(self):
+        if self.t == 1:
+            self.elements.rotate(self.et * self.angle, self.axis, self.anchor)
         else:
-            self.elements.dynamic_rotate(et * self.angle, self.axis, self.anchor)
-        return [self.elements]
+            self.elements.dynamic_rotate(self.et * self.angle, self.axis, self.anchor)
 
 
 class Common(Tween):
-    def __init__(self, val, **kwargs):
-        self.p1 = None
-        self.p2 = val
+    def __init__(self, p1, p2, **kwargs):
+        self.p1 = p1
+        self.p2 = p2
         super().__init__(**kwargs)
 
-    def update(self, rel_frame_number):
-        t = self.progress(rel_frame_number)
-        et = self.ease(t)
+    def update(self):
         if type(self.elements) == Group:
             for element in self.elements:
-                self.update_element(element, et)
+                self.update_element(element)
         else:
-            self.update_element(self.elements, et)
-
-        return [self.elements]
+            self.update_element(self.elements)
 
 
 class stroke(Common):
-    def update_element(self, element, et):
+    def update_element(self, element):
         if self.p1 is None:
             self.p1 = element._stroke
-        self.p2 = np.array(self.p2)
-        self.elements.stroke((1 - et) * self.p1 + et * self.p2)
+        self.elements.stroke(Color(**{self.p2.specification:((1 - self.et) * self.p1.value + self.et * self.p2.value)}))
 
 
 class fill(Common):
-    def update_element(self, element, et):
+    def update_element(self, element):
         if self.p1 is None:
             self.p1 = element._fill
-        self.p2 = np.array(self.p2)
-        self.elements.fill((1 - et) * self.p1 + et * self.p2)
+        self.elements.fill(Color(**{self.p2.specification:((1 - self.et) * self.p1.value + self.et * self.p2.value)}))
 
 
 class stroke_width(Common):
-    def update_element(self, element, et):
+    def update_element(self, element):
         if self.p1 is None:
             self.p1 = element._stroke_width
-        self.elements.stroke_width((1 - et) * self.p1 + et * self.p2)
+        self.elements.stroke_width((1 - self.et) * self.p1 + self.et * self.p2)
 
 
 class stroke_dasharray(Common):
-    def update_element(self, element, et):
+    def update_element(self, element):
         if self.p1 is None:
             self.p1 = element._stroke_dashoffset
         self.p2 = np.array(self.p2)
-        self.elements.stroke_dashoffset((1 - et) * self.p1 + et * self.p2)
+        self.elements.stroke_dashoffset((1 - self.et) * self.p1 + self.et * self.p2)
 
 
 class stroke_dashoffset(Common):
-    def update_element(self, element, et):
+    def update_element(self, element):
         if self.p1 is None:
             self.p1 = element._stroke_dashoffset
-        self.elements.stroke_dashoffset((1 - et) * self.p1 + et * self.p2)
+        self.elements.stroke_dashoffset((1 - self.et) * self.p1 + self.et * self.p2)
 
 
 class stroke_opacity(Common):
-    def update_element(self, element, et):
+    def update_element(self, element):
         if self.p1 is None:
             self.p1 = element._stroke_opacity
-        self.elements.stroke_opacity((1 - et) * self.p1 + et * self.p2)
+        self.elements.stroke_opacity((1 - self.et) * self.p1 + self.et * self.p2)
 
 
 class fill_opacity(Common):
-    def update_element(self, element, et):
+    def update_element(self, element):
         if self.p1 is None:
             self.p1 = element._fill_opacity
-        self.elements.fill_opacity((1 - et) * self.p1 + et * self.p2)
+        self.elements.fill_opacity((1 - self.et) * self.p1 + self.et * self.p2)
 
 
 class opacity(Common):
-    def update_element(self, element, et):
+    def update_element(self, element):
         if self.p1 is None:
             self.p1 = element._opacity
-        self.elements.opacity((1 - et) * self.p1 + et * self.p2)
+        self.elements.opacity((1 - self.et) * self.p1 + self.et * self.p2)
 
 
 class draw(Tween):
@@ -221,10 +213,8 @@ class draw(Tween):
         self.end = np.array(end)
         super().__init__(**kwargs)
 
-    def update(self, rel_frame_number):
-        t = self.progress(rel_frame_number)
-        et = self.ease(t)
-        self.elements.stroke_dasharray((1 - et) * self.start + et * self.end)
+    def update(self):
+        self.elements.stroke_dasharray((1 - self.et) * self.start + self.et * self.end)
         return [self.elements]
 
 class play(Tween):
@@ -265,16 +255,15 @@ class play(Tween):
             self.total_frame_count = len(os.listdir(f'/tmp/img_seq/{self.file_hash}')) - 1
         nth_img = ((rel_frame_number+self.play_start_frame)%self.total_frame_count)+1
         self.elements.set_image(f'/tmp/img_seq/{self.file_hash}/{nth_img}.png')
-        return [self.elements]
 
 class camera_position(Common):
-    def update_element(self, element, et):
+    def update_element(self, element):
         if self.p1 is None:
             self.p1 = element._position
-        self.elements.set_position((1 - et) * self.p1 + et * self.p2)
+        self.elements.set_position((1 - self.et) * self.p1 + self.et * self.p2)
 
 class camera_focus(Common):
-    def update_element(self, element, et):
+    def update_element(self, element):
         if self.p1 is None:
             self.p1 = element._focus
-        self.elements.set_focus((1 - et) * self.p1 + et * self.p2)
+        self.elements.set_focus((1 - self.et) * self.p1 + self.et * self.p2)

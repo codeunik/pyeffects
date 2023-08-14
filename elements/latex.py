@@ -7,57 +7,54 @@ import numpy as np
 from .group import Group
 from .path import Path
 from .shapes import Rectangle
-
+from .utils import Color
 
 class TexConfig:
     main_font = None
     mono_font = None
     sans_font = None
-    margin = 5.5
-    scale_factor = 8
-    fill = [255, 255, 255]
-    stroke = [255, 255, 255]
+    font_size = 40
+    fill = Color(rgb=(1,1,1))
+    stroke = Color(rgb=(1,1,1))
     stroke_width = 1
 
-    @staticmethod
-    def text_box(width=None, scale_factor=None, margin=None):
-        TexConfig.margin = round((594.691842 - (width/scale_factor)) / 56.76466 if width and scale_factor \
-                            else TexConfig.margin if margin is None else margin, 2)
-        TexConfig.scale_factor = round(width / (594.691842 - margin * 56.76466) if width and margin \
-                                else TexConfig.scale_factor if scale_factor is None else scale_factor, 2)
+    # @staticmethod
+    # def text_box(width=None, scale_factor=None, margin=None):
+    #     TexConfig.margin = round((594.691842 - (width/scale_factor)) / 56.76466 if width and scale_factor \
+    #                         else TexConfig.margin if margin is None else margin, 2)
+    #     TexConfig.scale_factor = round(width / (594.691842 - margin * 56.76466) if width and margin \
+    #                             else TexConfig.scale_factor if scale_factor is None else scale_factor, 2)
 
 
 def Tex(expr):
-    filename = hashlib.md5(bytes(f"{expr, TexConfig.main_font, TexConfig.mono_font, TexConfig.sans_font, TexConfig.margin}", encoding="utf-8")).hexdigest()
-    if not os.path.exists(f"/tmp/{filename}.tex"):
-        with open(f'/tmp/{filename}.tex', 'w') as f:
+    filename = hashlib.md5(bytes(f"{expr, TexConfig.main_font, TexConfig.mono_font, TexConfig.sans_font}", encoding="utf-8")).hexdigest()
+    if not os.path.exists(f"/tmp/pyeffects/text/{filename}.tex"):
+        with open(f'/tmp/pyeffects/text/{filename}.tex', 'w') as f:
             f.write(f'''
-\\documentclass{{article}}
+\\documentclass[11pt]{{article}}
 \\usepackage{{amsmath}}
 \\usepackage{{amssymb}}
 \\usepackage{{amsfonts}}
 \\usepackage{{tikz}}
 \\usepackage[none]{{hyphenat}}
-\\usepackage[a4paper, margin={TexConfig.margin}cm]{{geometry}}
+\\usepackage[a4paper, margin=0pt,paperheight=399bp,paperwidth=600bp]{{geometry}}
 \\usepackage{{fontspec}}
 ''' + (f"\\setmainfont{{{TexConfig.main_font}}}" if TexConfig.main_font else "")
     + (f"\\setmonofont{{{TexConfig.mono_font}}}" if TexConfig.mono_font else "")
     + (f"\\setsansfont{{{TexConfig.sans_font}}}" if TexConfig.sans_font else "")
-+ f'''\\thispagestyle{{empty}}
++ f'''\\parindent=0pt
+\\thispagestyle{{empty}}
 \\begin{{document}}
-{expr}
+{{\\fontsize{{{TexConfig.font_size}}}{{{1.2*TexConfig.font_size}}}\selectfont {expr}}}
 \\end{{document}}''')
 
-        os.system(f"cd /tmp && xelatex -no-pdf {filename}.tex > /dev/null 2>&1 && dvisvgm -e -n {filename}.xdv > /dev/null 2>&1")
+        os.system(f"cd /tmp/pyeffects/text/ && xelatex -no-pdf {filename}.tex > /dev/null 2>&1 && dvisvgm -e -n {filename}.xdv > /dev/null 2>&1")
 
-    with open(f'/tmp/{filename}.svg', 'r') as f:
+    with open(f'/tmp/pyeffects/text/{filename}.svg', 'r') as f:
         soup = bs4.BeautifulSoup(f, 'xml')
 
     uses = soup.find_all('use')
     rects = soup.find_all('rect')
-
-    def transform_tex_point(point, x, y):
-        return complex(point.real + x, -point.imag - y)
 
     chars = Group()
     fx = float(uses[0].attrs['x'])
@@ -79,5 +76,5 @@ def Tex(expr):
         chars.add(r)
 
     chars.fill(TexConfig.fill).stroke(TexConfig.stroke).stroke_width(TexConfig.stroke_width)
-    chars.scale(TexConfig.scale_factor, TexConfig.scale_factor)
+    # chars.scale(TexConfig.scale_factor, TexConfig.scale_factor)
     return chars

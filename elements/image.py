@@ -2,6 +2,11 @@ import numpy as np
 import os
 from .element import Element
 import subprocess
+import base64
+from PIL import ImageOps, Image as PILImage
+from io import BytesIO
+
+
 
 class Image(Element):
     def __init__(self, x, y, width, height, img_path, preserve_aspect_ratio="xMidYMid slice"):
@@ -9,8 +14,12 @@ class Image(Element):
         self.y = y
         self.width = width
         self.height = height
-        self.filepath = os.path.abspath(img_path)
-        self.preserve_aspect_ration = preserve_aspect_ratio
+        img = PILImage.open(os.path.abspath(img_path))
+        img_flip = ImageOps.flip(img)
+        buffered = BytesIO()
+        img_flip.save(buffered, format="PNG")
+        self.base64_encode = base64.b64encode(buffered.getvalue()).decode('utf-8')
+        self.preserve_aspect_ratio = preserve_aspect_ratio
         Element.__init__(self)
 
     def set_dimension(self, x=None, y=None, width=None, height=None):
@@ -23,13 +32,13 @@ class Image(Element):
         self.filepath = os.path.abspath(img_path)
 
     def _draw(self):
-        attr_str = f'<image x="{self.x}" y="{self.y}" width="{self.width}" height="{self.height}" href="{self.filepath}"' \
-                   f' transform="matrix(1 0 0 -1 0 1080) matrix{tuple(self.transform_2d())}" preserveAspectRatio="{self.preserve_aspect_ration}" '
+        attr_str = f'<image x="{self.x}" y="{self.y}" width="{self.width}" height="{self.height}" xlink:href="data:image/png;base64,{self.base64_encode}"' \
+                   f' transform="matrix{tuple(self.transform_2d())}" preserveAspectRatio="{self.preserve_aspect_ratio}" '
         attr_str += super()._draw()
         attr_str += "></image>"
         return attr_str
 
-    def _border_length(self):
+    def border_length(self):
         a00, a10, a01, a11, a02, a12 = self.transform_2d()
         matrix = np.array([[a00, a01, a02], [a10, a11, a12], [0, 0, 1]])
         vertices = np.array([

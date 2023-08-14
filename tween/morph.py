@@ -4,10 +4,9 @@ import numpy as np
 from scipy.optimize import linear_sum_assignment
 
 from . import ease
-from ..elements.frame import Scene
 from ..elements.group import Group
 from ..elements.path import Path
-from ..elements.svgpathtools import CubicBezier, Line
+from svgpathtools import CubicBezier, Line
 from .tween import Tween
 
 

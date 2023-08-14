@@ -4,10 +4,12 @@ from .camera import Camera
 from .defs import Def, Mask, ClipPath
 from .element import Element
 from .group import Group
+import gzip
+#import os
 
 
 class Frame:
-    def_types = ["_fill", "_stroke", "_filter", "_clip_path", "_mask"]
+    def_types = ["_fill", "_stroke", "_filter", "_clip_path", "_mask"] 
 
     def __init__(self, width, height):
         self._header = f'''<svg width="{width}" height="{height}" version="1.1" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g transform="matrix(1, 0, 0, -1, 0, 1080)">'''
@@ -16,13 +18,15 @@ class Frame:
         self.defs = dict()
 
     def add(self, elements):
-        if isinstance(elements, Group):
-            if self.groups.get(id(elements), True):
-                self.groups.setdefault(id(elements), False)
-                for element in elements:
-                    self.elements.setdefault(id(element), element)
-        elif isinstance(elements, Element):
-            self.elements.setdefault(id(elements), elements)
+        bbox = elements.bbox()
+        if bbox[0,0] <= 1920 and 0 <= bbox[1,0] and bbox[0,1] <= 1080 and 0 <= bbox[1,1]:
+            if isinstance(elements, Group):
+                if self.groups.get(id(elements), True):
+                    self.groups.setdefault(id(elements), False)
+                    for element in elements:
+                        self.elements.setdefault(id(element), element)
+            elif isinstance(elements, Element):
+                self.elements.setdefault(id(elements), elements)
 
         return self
 
@@ -31,38 +35,35 @@ class Frame:
             if isinstance(getattr(element, _type), Def):
                 self.defs.setdefault(getattr(element, _type).id, getattr(element, _type))
                 if isinstance(getattr(element, _type), Mask) or isinstance(getattr(element, _type), ClipPath):
-                    self._handle_defs(getattr(element, _type).element)
+                    if isinstance(getattr(element, _type).elements, Group):
+                        for ele in getattr(element, _type).elements:
+                            self._handle_defs(ele)
 
-    def save(self, path):
+    def generate(self):
         z_indexed_elements = list(self.elements.values())
         z_indexed_elements.sort(key=lambda element: element.get_z_index())
-        svg_desc = self._header
+        self.svg_desc = self._header
 
         for element in z_indexed_elements:
-            svg_desc += element._draw()
+            self.svg_desc += element._draw()
             self._handle_defs(element)
 
-        svg_desc += "<defs>"
+        self.svg_desc += "<defs>"
         for d in self.defs.values():
-            svg_desc += d._str_def()
-        svg_desc += "</defs>"
+            self.svg_desc += d._str_def()
+        self.svg_desc += "</defs>"
 
-        #element.dynamic_reset()
-        svg_desc += "</g></svg>"
+        # element.dynamic_reset()
+        self.svg_desc += "</g></svg>"
 
-        with open(path, "w") as f:
-            f.write(svg_desc)
+        return self.svg_desc
 
-class FrameConfig:
-    width = 1920
-    height = 1080
 
-class Scene:
-    count = 1
+    def save(self, path):
 
-    def __init__(self, *elements):
-        frame = Frame(FrameConfig.width, FrameConfig.height)
-        for element in elements:
-            frame.add(element)
-        frame.save(f"scene{Scene.count}.svg")
-        Scene.count += 1
+        with open(path, 'w') as f:
+            f.write(self.svg_desc)
+
+        # with gzip.open(path, "wb") as f:
+        #     f.write(self.svg_desc.encode())
+            

@@ -1,6 +1,6 @@
 from .camera import Camera
 from .defs import ClipPath, LinearGradient, Mask, RadialGradient, FilterEffect, Gourad
-from .frame import Frame, Scene, FrameConfig
+from .frame import Frame
 from .group import Group
 from .image import Image, Video
 from .latex import Tex, TexConfig

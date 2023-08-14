@@ -1,14 +1,9 @@
-import numpy as np
-
-from ..dynamic_data import DynamicDataIdentifier, d
-from ..timeline import Timeline
 from ..tween import *
 
 
 class Animation:
     def __init__(self):
         self.duration = 1
-        self.flag = 1
 
     def set_elements(self, elements):
         self.elements = elements
@@ -22,14 +17,18 @@ class Animation:
     def set_duration(self, duration):
         self.duration = duration
 
-    def get_duration(self):
-        return self.duration
+    def set_fps(self, fps):
+        self.fps = fps
 
+    def get_durations(self, weights):
+        a = self.fps * self.duration * weights / np.sum(weights)
+        a = np.round(a.cumsum())
+        durations = np.zeros_like(a)
+        durations[0] = a[0]
+        durations[1:] = a[1:] - a[:-1]
+        durations = durations / self.fps
+        return durations
+    
     def exec(self, start):
-        if self.flag:
-            for var in dir(self):
-                if isinstance(getattr(self, var), DynamicDataIdentifier):
-                    setattr(self, var, getattr(self, var).get())
-            self.flag = 0
         self.timeline._cursor = start
         self.animation()
