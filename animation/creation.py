@@ -3,13 +3,10 @@ from pyeffects import g
 from copy import deepcopy
 import numpy as np
 from ..elements import Rectangle, Path, Mask
-import uuid
 
 class handwrite(Animation):
-    def __init__(self, pointer, hand='hand', pen_tip='pen_tip', is_text=False):
-        super().__init__()
-        self.pointer = pointer
-        g[self.pointer].opacity(0)
+    def __init__(self, hand, pen_tip, is_text):
+        super().__init__()        
         self.hand = hand
         self.pen_tip = pen_tip
         self.is_text = is_text
@@ -17,11 +14,42 @@ class handwrite(Animation):
     def animation(self):
         def after_update(ctx, **kwargs):
             path_end_point = kwargs['element'].point(ctx.et)
-            pen_tip = g[self.pen_tip]
-            bbox = g[self.hand].bbox()
-            g[self.hand].translate(-bbox[0,0]-pen_tip[0]+path_end_point[0], -bbox[0,1]-pen_tip[1]+path_end_point[1])
+            bbox = self.hand.bbox()
+            self.hand.translate(-bbox[0,0]-self.pen_tip[0]+path_end_point[0], -bbox[0,1]-self.pen_tip[1]+path_end_point[1])
+
+        def triangle_area(p1, p2, p3):
+            x1, y1 = p1
+            x2, y2 = p2
+            x3, y3 = p3
+            return 0.5 * np.abs(x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2))
 
         def space_filling_curve(ele):
+            N = 100
+            points_along_curve = []
+            for n in range(2*N):
+                try:
+                    points_along_curve.append(ele.point(n/(2*N)))
+                except:
+                    points_along_curve.append(ele.point(0))
+
+            curve_area = triangle_area(points_along_curve[0], points_along_curve[1], points_along_curve[-1]) \
+            + triangle_area(points_along_curve[N-1], points_along_curve[N], points_along_curve[N+1])
+            for i in range(1, N):
+                curve_area += triangle_area(points_along_curve[i], points_along_curve[i+1], points_along_curve[-i]) \
+                + triangle_area(points_along_curve[-i], points_along_curve[-i-1], points_along_curve[i+1])
+
+            stroke_width = 2 * curve_area / ele.border_length()
+            if stroke_width > 10:
+                return space_filling_curve2(ele), False
+            else:
+                space_filling_curve = " ".join([f"L {points_along_curve[i]} {points_along_curve[2*N-1-i]}" for i in range(N)])
+                space_filling_curve = Path("M" + space_filling_curve[1:]).stroke_width(stroke_width).stroke_opacity(0).stroke("white")
+                r = Rectangle(0,0,0.001,0.001)
+                m = Mask(Group(space_filling_curve, r))
+                ele.stroke_width(0).mask(m).fill_opacity(1)
+                return space_filling_curve, True
+
+        def space_filling_curve2(ele):
             smallest_area = np.inf
             best_angle = 0
             for ra in range(0,90,5):
@@ -49,15 +77,18 @@ class handwrite(Animation):
             pen_tip_line = "M"+pen_tip_line[1:]
             pen_tip_line = Path(pen_tip_line).rotate(-best_angle).stroke_width(stroke_width).stroke_opacity(0).stroke("white")
             
+            ele.rotate(-best_angle)
             r = deepcopy(ele.rotate(-best_angle)).stroke("black").stroke_opacity(1).opacity(1)
+            # r = Rectangle(0,0,0.001,0.001)
             m = Mask(Group(pen_tip_line, r))
             ele.stroke_width(0).mask(m).fill_opacity(1)
             return pen_tip_line
 
         # keep the original
-        original = deepcopy(g[self.pointer])
-                
-        self.elements = Group(self.elements)
+        original = deepcopy(self.elements)
+
+        g[self.elements.name] = Group(self.elements)
+        self.elements = g[self.elements.name]
 
         # self.timeline.add_animation(self.elements, [stroke_opacity(p1=1, p2=0)], 0, 0) # fill(p1=Color(rgb=(0,0,0)), p2=Color(rgb=(0,0,0)))
 
@@ -69,64 +100,70 @@ class handwrite(Animation):
             for item in self.elements:
                 tmp.append(item.fill_opacity(0).stroke_opacity(0))
                 tmp.append(deepcopy(item))
-            self.elements = Group(*tmp[::-1])
+            elements = Group(*tmp[::-1])
         
-        g[self.pointer] = Group(*tmp)
-
+        self.elements = Group(*tmp)
 
         # calculate element drawing durations
-        element_durations = [None for _ in range(len(self.elements))]
+        element_durations = [None for _ in range(len(elements))]
         if self.is_text:
-            for i in range(len(self.elements)):
-                element_durations[i] = self.elements[i].border_length()
+            for i in range(len(elements)):
+                element_durations[i] = elements[i].border_length()
         else:
-            for i in range(0, len(self.elements), 2):
-                element_durations[i+1] = self.elements[i+1].border_length()
-                if self.elements[i].get_fill() != 'white':
-                    element_durations[i] = self.elements[i].border_length()
+            coloring_curves = [None for _ in range(len(elements))]
+            for i in range(0, len(elements), 2):
+                if elements[i].get_fill() != 'white':
+                    element_durations[i] = elements[i].border_length()
+                    coloring_curve, is_stroke = space_filling_curve(elements[i])  
+                    coloring_curves[i] = coloring_curve                      
                 else:
                     element_durations[i] = 0
+
+                if is_stroke:
+                    element_durations[i+1] = 0
+                else:
+                    element_durations[i+1] = elements[i+1].border_length()
 
         element_durations = self.get_durations(np.array(element_durations))
 
 
         if self.is_text:
-            for i in range(0, len(self.elements)):
-                self.timeline.add_animation(self.elements[i], [
+            for i in range(0, len(elements)):
+                self.timeline.add_animation(elements[i], [
                         draw([0, 1], [1, 0], 
-                        before_update=lambda self: [self.elements.stroke_opacity(1), self.elements.opacity(1)] if self.t==0 else None,
-                        after_update = after_update, after_update_kwargs={'element':self.elements[i]})],
+                        before_update=lambda ctx: [ctx.elements.stroke_opacity(1), ctx.elements.opacity(1)] if ctx.t==0 else None,
+                        after_update = after_update, after_update_kwargs={'element': elements[i]})],
                         0,
                         element_durations[i],
                         ease=self.ease)
             
         else:
             
-            for i in range(0, len(self.elements), 2):
-                self.timeline.add_animation(self.elements[i+1], [
+            for i in range(0, len(elements), 2):
+                self.timeline.add_animation(elements[i+1], [
                         draw([0, 1], [1, 0], 
-                        before_update=lambda self: self.elements.stroke_opacity(1).fill_opacity(1).opacity(1) if self.t==0 else None,
-                        after_update = after_update, after_update_kwargs={'element':self.elements[i+1]})],
+                        before_update=lambda ctx: ctx.elements.stroke("black" if ctx.elements.get_fill()=='white' else ctx.elements.get_fill()).stroke_opacity(1).opacity(1) if ctx.t==0 else None,
+                        after_update = after_update, after_update_kwargs={'element': elements[i+1]})],
                         0,
                         element_durations[i+1],
                         ease=self.ease)
                 
-                if self.elements[i].get_fill() != 'white':
-                    coloring_curve = space_filling_curve(self.elements[i])
+                if elements[i].get_fill() != 'white':
+                    coloring_curve = coloring_curves[i]
                     
                     self.timeline.add_animation(coloring_curve, [
                         draw([0, 1], [1, 0], 
                         before_update=lambda ctx, **kwargs: [ctx.elements.stroke_opacity(1), kwargs['element'].stroke_opacity(1).fill_opacity(1).opacity(1)] if ctx.t==0 else None,
-                        before_update_kwargs=dict(element=self.elements[i]),
-                        after_update = after_update, after_update_kwargs={'element':coloring_curve})],
+                        before_update_kwargs=dict(element=elements[i]),
+                        after_update = after_update, after_update_kwargs={'element': coloring_curve})],
                         0,
                         element_durations[i],
                         ease=self.ease)
         
         def place_original(ctx, **kwargs):
-            g[kwargs['pointer']] = kwargs['original'].opacity(1)
+            g[kwargs['name']] = kwargs['original'].opacity(1)
         self.timeline.add_animation(None, [Tween(before_update=place_original,
-                                                 before_update_kwargs=dict(pointer=self.pointer, original=original))], 0, 0)
+                                                 before_update_kwargs=dict(name=self.elements.name, original=original))], 0, 0)
             
         # self.timeline.add_animation(self.elements, [fill_opacity(1)],
         #                             0,
@@ -143,7 +180,7 @@ class reveal(Animation):
 
     def animation(self):
         masks = []
-        elements = []
+        elements = [] 
         def gen_mask(element):
             if 'rect' in self.mode:
                 bbox = element.bbox()
@@ -158,14 +195,14 @@ class reveal(Animation):
                     masks.append(Mask(rect.translate(*(element.anchor_point([1,0])-element.anchor_point([0,0])))))
 
         if self.is_elementwise:
-            for element in self.elements:
+            for element in g[self.element_id]:
                 gen_mask(element)
                 element.mask(masks[-1])
                 elements.append(element)             
         else:
-            gen_mask(self.elements)
-            [element.mask(masks[-1]) for element in self.elements]
-            elements.append(self.elements)
+            gen_mask(g[self.element_id])
+            [element.mask(masks[-1]) for element in g[self.element_id]]
+            elements.append(g[self.element_id])
         
         def animate(mask, element, delay):
             if self.mode == 'rect-tb':
@@ -185,7 +222,6 @@ class reveal(Animation):
                 first = False
             else:
                 animate(mask, element, -self.duration/len(masks)*(1-self.lag_ratio))
-            
 
 class arrow(Animation):
     def __init__(self, arrow_head):
@@ -193,7 +229,6 @@ class arrow(Animation):
         self.arrow_head = arrow_head
 
     def animation(self):
-
         def put_arrow_head(ctx, **elements):
             curve_head = self.elements.point(ctx.et)
             if ctx.t == 1:
@@ -203,10 +238,9 @@ class arrow(Animation):
             angle = np.rad2deg(np.arctan2(tangent[1], tangent[0]))
             arrow_head = deepcopy(elements['arrow_head'])
             arrow_head.translate(*(curve_head-arrow_head.anchor_point([0.5,0.5]))).rotate(angle)
-            g['arrow_head'] = arrow_head
+            g[arrow_head.name] = arrow_head
 
         self.timeline.add_animation(self.elements, [draw(after_update=put_arrow_head, after_update_kwargs=dict(arrow_head=self.arrow_head))], 0, self.duration)
-
 
 class dim_n_lit(Animation):
     def __init__(self, value=0.3, transition_time=0.2):

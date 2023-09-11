@@ -3,29 +3,37 @@ __version__ = "1.0"
 __copyright__ = "Copyright (c) 2020 Partha Ghosh"
 __license__ = "MIT"
 
-global g, b # global container, blocked elements container
+
+global g # global container, blocked elements container
 
 class G(dict):
 
     def __init__(self):
         super().__init__()
-    
-    def get(self, *pointers):
-        x = self
-        for pointer in pointers:
-            x = x[pointer]
-        return x
 
-    def set(self, *pointers, value):
-        x = self
-        for i, pointer in enumerate(pointers):
-            x.setdefault(pointer, dict())
-            if i == len(pointers)-1:
-                x[pointer] = value
-            else:
-                x = x[pointer]
+    def __setitem__(self, key, value):
+        super().__setitem__(key, value)
+        try:
+            value.name = key
+        except:
+            pass
+        # if isinstance(self[key], Group):
+        #     for element in self[key]:
+        #         if not hasattr(element, 'name'):
+        #             self.__setitem__(uuid.uuid4().hex, element)
 
-b = dict()
+    def asynk(self, key):
+        async def f(key):
+            return super(G, self).__getitem__(key)
+        return f(key)
+
+    def __delitem__(self, key):
+        # if isinstance(self[key], Group):
+        #     for element in self[key]:
+        #         super().__delitem__(element.name)
+        super().__delitem__(key)
+
+
 g = G()
 
 import warnings

@@ -59,6 +59,39 @@ class Scheduler:
 #     def clear(self):
 #         self.actions.clear()
 
+
+# class Node:
+#     def __init__(self, data):
+#         self.data = data
+#         self.prev = None
+#         self.next = None
+
+# class LinkedList:
+#     def __init__(self) -> None:
+#         self.head = None
+#         self.tail = None
+    
+#     def add(self, node):
+#         if self.head is None:
+#             self.head = node
+#         elif self.tail is None:
+#             node.prev = self.head
+#             self.head.next = node
+#             self.tail = node
+#         else:
+#             node.prev = self.tail
+#             self.tail.next = node
+#             self.tail = node
+
+#     def traverse(self):
+#         node = self.head
+#         flag = True
+#         while flag:
+#             yield node.data
+#             node = node.next
+#             if node is None:
+#                 flag = False
+
 class Timeline:
     fps = 60
     blocklist = dict()
@@ -67,6 +100,8 @@ class Timeline:
         if fps:
             Timeline.fps = fps
         
+        self.round_ndigits = len(f'{Timeline.fps}')
+
         self._cursor = 0
         self._lifetime = 0
         self._actions = dict()
@@ -105,6 +140,7 @@ class Timeline:
         end = self._cursor
         self._lifetime = max(self._lifetime, end)
         ease = ease if callable(ease) else ease.rate
+        print(start, end)
         for anim in anims:
             anim.set_elements(elements)
             anim.set_ease(ease)
@@ -143,16 +179,8 @@ class Timeline:
     def time(self):
         return self._cursor / self.fps
 
-    def camera(self, anims, delay=0, duration=1, label=None, start=None, end=None, ease=None):
-        return self.add_animation(Camera, anims, delay, duration, label, start, end, ease)
-
     def lifetime(self, t):
         self._lifetime = t
-
-    def repeat(self, n):
-        for i in range(n):
-            self.add_timeline(self)
-        return self
 
     def position_cursor(self, start=None, end=None, delay=None, duration=None, label=None):
         if label:
@@ -161,15 +189,15 @@ class Timeline:
             else:
                 self._labels[label] = self._cursor
         if start:
-            start = math.ceil(start * Timeline.fps)
+            start = int(round(start, self.round_ndigits) * Timeline.fps)
             self._cursor = start
         if delay:
-            delay = math.ceil(delay * Timeline.fps) if delay >= 0 else math.floor(delay * Timeline.fps)
+            delay = int(round(delay, self.round_ndigits) * Timeline.fps)
             self._cursor = max(self._cursor + delay, 0)
 
         if duration:
-            duration = math.ceil(duration * Timeline.fps)
+            duration = int(round(duration, self.round_ndigits) * Timeline.fps)
             self._cursor = (self._cursor + duration)
         if end:
-            end = math.ceil(end * Timeline.fps)
+            end = int(round(end, self.round_ndigits) * Timeline.fps)
             self._cursor = end

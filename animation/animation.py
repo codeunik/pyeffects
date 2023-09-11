@@ -1,8 +1,7 @@
 from ..tween import *
 
-
 class Animation:
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.duration = 1
 
     def set_elements(self, elements):

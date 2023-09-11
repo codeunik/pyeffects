@@ -65,13 +65,16 @@ class Path(Element):
         self._convert_3d_to_2d()
         return self._data_2d.length()
 
-    def continuous_subpaths(self):
+    def continuous_subpaths(self, order=True):
         continuous_subpaths = []
         # self._convert_3d_to_2d()
         for cp in self._data_2d.continuous_subpaths():
             path = deepcopy(self)
             continuous_subpaths.append(path.set_segments(cp))
         
+        if order:
+            continuous_subpaths.sort(key=lambda path: path.bbox()[0,1])
+
         return Group(*continuous_subpaths)
 
     def modify_segments(self, indicies, modified_segments):
@@ -148,7 +151,7 @@ class Path(Element):
 
     def _get_vertex_avg(self):
         self._get_transformed_points()
-        self._vertex_avg = sum(self._transformed_points[:-1]) / (len(self._transformed_points) - 1)
+        self._vertex_avg = sum(self._transformed_points[:-1]) / len(self._transformed_points)
 
     def _str_fill(self):
         if self._shading_type:

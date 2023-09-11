@@ -195,6 +195,12 @@ class SVGParser:
 
     def _apply_transforms(self, element, transforms):
         d = dict()
+        tmp = []
+        for ts in transforms:
+            for t in ts.split(')'):
+                if t:
+                    tmp.append(t.strip(' ')+")")
+        transforms = tmp
         for transform in transforms:
             if "translate" in transform:
                 exec(transform.replace("translate", "x=").replace(" ", ","), d)
@@ -202,20 +208,20 @@ class SVGParser:
                     element.translate(*d['x'], 0)
                 else:
                     element.translate(d['x'], 0, 0)
-            elif "scale" in transform:
+            if "scale" in transform:
                 exec(transform.replace("scale", "x=").replace(" ", ","), d)
                 if type(d['x']) == tuple:
                     element.scale(d['x'][0], d['x'][1], 1, [0, 0, 0], True)
                 else:
                     element.scale(d['x'], d['x'], 1, [0, 0, 0], True)
-            elif "rotate" in transform:
+            if "rotate" in transform:
                 exec(transform.replace("rotate", "x=").replace(" ", ","), d)
                 if type(d['x']) == tuple:
                     element.rotate(d['x'][0], [0, 0, 1],
                                    [d['x'][1], d['x'][2], 0], True)
                 else:
                     element.rotate(d['x'], [0, 0, 1], [0, 0, 0], True)
-            elif "skewX" in transform:
+            if "skewX" in transform:
                 exec(transform.replace("skewX", "x=").replace(" ", ","), d)
                 element.matrix(
                     np.array([
@@ -224,7 +230,7 @@ class SVGParser:
                         [0, 0, 1, 0],
                         [0, 0, 0, 1.0],
                     ]))
-            elif "skewY" in transform:
+            if "skewY" in transform:
                 exec(transform.replace("skewY", "x=").replace(" ", ","), d)
                 element.matrix(
                     np.array([
@@ -233,7 +239,7 @@ class SVGParser:
                         [0, 0, 1, 0],
                         [0, 0, 0, 1.0],
                     ]))
-            else:
+            if "matrix" in transform:
                 exec(transform.replace("matrix", "x=").replace(" ", ","), d)
                 element.matrix(
                     np.array([

@@ -20,11 +20,11 @@ class Element(Transform, Place):
         self._stroke = "nil"
         self._stroke_width = "nil"
         self._fill = "nil"
-        self._opacity = "nil"
+        self._opacity = 1
         self._fill_opacity = "nil"
         self._stroke_opacity = "nil"
-        self._stroke_linecap = "nil"
-        self._stroke_linejoin = "nil"
+        self._stroke_linecap = "round"
+        self._stroke_linejoin = "round"
         self._stroke_miterlimit = "nil"
         self._stroke_dashoffset = "nil"
         self._stroke_dasharray = "nil"    # list

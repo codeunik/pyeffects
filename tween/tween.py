@@ -2,18 +2,19 @@ import numpy as np
 
 from ..elements.element import Element
 from ..elements.group import Group
+from ..elements.place import Place
 from ..elements.utils import Color
 import os
 import hashlib
 from ..elements.image import Video
+from pyeffects import g
+import asyncio
 
 class Tween:
-    def __init__(self, before_update=None, before_update_kwargs=dict(), after_update=None, after_update_kwargs=dict()):
+    def __init__(self, before_update=None, after_update=None):
 
         self.before_update = before_update
         self.after_update = after_update
-        self.before_update_kwargs = before_update_kwargs
-        self.after_update_kwargs = after_update_kwargs
 
         self.start_frame = 0
         self.end_frame = -1
@@ -27,11 +28,14 @@ class Tween:
 
     def exec(self, frame_number):
         self.frame_number = frame_number
-        if self.before_update:
-            self.before_update(self, **self.before_update_kwargs)
+        if self.t == 0:
+            if self.elements is not None:
+                self.elements = asyncio.run(self.elements)
+        if self.before_update is not None:
+            asyncio.run(self.before_update(self))
         self.update()
-        if self.after_update:
-            self.after_update(self, **self.after_update_kwargs)
+        if self.after_update is not None:
+            asyncio.run(self.after_update(self))
 
     def update(self):
         pass

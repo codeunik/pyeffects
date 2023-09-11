@@ -11,12 +11,16 @@ from .utils import Color
 
 class TexConfig:
     main_font = None
+    font_path = None
     mono_font = None
     sans_font = None
     font_size = 40
     fill = Color(rgb=(1,1,1))
     stroke = Color(rgb=(1,1,1))
     stroke_width = 1
+    page_width = 1920
+    page_height = 1080
+    line_spacing = 1.2
 
     # @staticmethod
     # def text_box(width=None, scale_factor=None, margin=None):
@@ -26,8 +30,9 @@ class TexConfig:
     #                             else TexConfig.scale_factor if scale_factor is None else scale_factor, 2)
 
 
-def Tex(expr):
-    filename = hashlib.md5(bytes(f"{expr, TexConfig.main_font, TexConfig.mono_font, TexConfig.sans_font}", encoding="utf-8")).hexdigest()
+def Tex(expr, justify='center'):
+    backslash = '\\'
+    filename = hashlib.md5(bytes(f"{expr, str(TexConfig.__dict__)}", encoding="utf-8")).hexdigest()
     if not os.path.exists(f"/tmp/pyeffects/text/{filename}.tex"):
         with open(f'/tmp/pyeffects/text/{filename}.tex', 'w') as f:
             f.write(f'''
@@ -37,19 +42,25 @@ def Tex(expr):
 \\usepackage{{amsfonts}}
 \\usepackage{{tikz}}
 \\usepackage[none]{{hyphenat}}
-\\usepackage[a4paper, margin=0pt,paperheight=399bp,paperwidth=600bp]{{geometry}}
+\\usepackage[a4paper, margin=0pt,paperheight={TexConfig.page_height}bp,paperwidth={TexConfig.page_width}bp]{{geometry}}
 \\usepackage{{fontspec}}
-''' + (f"\\setmainfont{{{TexConfig.main_font}}}" if TexConfig.main_font else "")
+\\defaultfontfeatures{{Ligatures={{NoCommon, NoDiscretionary, NoHistoric, NoRequired, NoContextual}}}}
+''' + (f"\\setmainfont{'[Path='+TexConfig.font_path+']' if TexConfig.font_path else ''}{{{TexConfig.main_font}}}" if TexConfig.main_font else "")
     + (f"\\setmonofont{{{TexConfig.mono_font}}}" if TexConfig.mono_font else "")
     + (f"\\setsansfont{{{TexConfig.sans_font}}}" if TexConfig.sans_font else "")
 + f'''\\parindent=0pt
 \\thispagestyle{{empty}}
+\\linespread{{{TexConfig.line_spacing}}}
+
 \\begin{{document}}
+{'{}begin{{center}}'.format(backslash) if justify=='center' else ''}
 {{\\fontsize{{{TexConfig.font_size}}}{{{1.2*TexConfig.font_size}}}\selectfont {expr}}}
+{'{}end{{center}}'.format(backslash) if justify=='center' else ''}
 \\end{{document}}''')
 
+        # os.system(f"cd /tmp/pyeffects/text/ && xelatex -no-pdf {filename}.tex && dvisvgm -e -n {filename}.xdv")
         os.system(f"cd /tmp/pyeffects/text/ && xelatex -no-pdf {filename}.tex > /dev/null 2>&1 && dvisvgm -e -n {filename}.xdv > /dev/null 2>&1")
-
+    
     with open(f'/tmp/pyeffects/text/{filename}.svg', 'r') as f:
         soup = bs4.BeautifulSoup(f, 'xml')
 

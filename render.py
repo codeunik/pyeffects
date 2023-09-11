@@ -1,10 +1,11 @@
 import multiprocessing as mp
+import threading
 import subprocess as sp
 import os
 # from wand.image import Image
 # import cairosvg
 from .elements.place import Place
-from pyeffects import g, b, Frame
+from pyeffects import g, Frame
 import tempfile
 import pandas as pd
 
@@ -54,8 +55,7 @@ class Renderer:
 
             for k, v in pd.json_normalize(g, sep='.').to_dict(orient='records')[0].items():
                 if issubclass(type(v), Place):
-                    if v not in b.values():
-                        frame.add(v)
+                    frame.add(v)
 
             svg_data = frame.generate().encode()
             if video:
@@ -84,11 +84,9 @@ class Renderer:
             # cairosvg.svg2png(frame.generate(), unsafe=True, write_to=pipe.stdin)
 
             if svg:
-                if save_frames.get(-1):
-                    frame.save(f'svgs/{Renderer.count}/{str(frame_number).zfill(8)}.svg')
-                elif save_frames.get(frame_number, False):
-                    frame.save(f'svgs/{Renderer.count}/{frame_number}.svg')
-
+                p = threading.Thread(target=self.save_svg, args=(frame, frame_number, save_frames))
+                p.start()
+                
             for element in frame.elements.values():
                 element.dynamic_reset()
                 try:
@@ -117,6 +115,12 @@ class Renderer:
 
         with open(f'pngs/{Renderer.count}/{str(frame_number).zfill(8)}.png', 'wb') as f:
             f.write(png_data)
+
+    def save_svg(self, frame, frame_number, save_frames):
+        if save_frames.get(-1):
+            frame.save(f'svgs/{Renderer.count}/{str(frame_number).zfill(8)}.svg')
+        elif save_frames.get(frame_number, False):
+            frame.save(f'svgs/{Renderer.count}/{frame_number}.svg')
 
 
 

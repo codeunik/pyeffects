@@ -18,15 +18,13 @@ class Frame:
         self.defs = dict()
 
     def add(self, elements):
-        bbox = elements.bbox()
-        if bbox[0,0] <= 1920 and 0 <= bbox[1,0] and bbox[0,1] <= 1080 and 0 <= bbox[1,1]:
-            if isinstance(elements, Group):
-                if self.groups.get(id(elements), True):
-                    self.groups.setdefault(id(elements), False)
-                    for element in elements:
-                        self.elements.setdefault(id(element), element)
-            elif isinstance(elements, Element):
-                self.elements.setdefault(id(elements), elements)
+        if isinstance(elements, Group):
+            if self.groups.get(id(elements), True):
+                self.groups.setdefault(id(elements), False)
+                for element in elements:
+                    self.elements.setdefault(id(element), element)
+        elif isinstance(elements, Element):
+            self.elements.setdefault(id(elements), elements)
 
         return self
 
@@ -45,8 +43,11 @@ class Frame:
         self.svg_desc = self._header
 
         for element in z_indexed_elements:
-            self.svg_desc += element._draw()
-            self._handle_defs(element)
+            bbox = element.bbox()
+            if bbox[0,0] <= 1920 and 0 <= bbox[1,0] and bbox[0,1] <= 1080 and 0 <= bbox[1,1]:
+                if element.get_opacity() != 0:        
+                    self.svg_desc += element._draw()
+                    self._handle_defs(element)
 
         self.svg_desc += "<defs>"
         for d in self.defs.values():
