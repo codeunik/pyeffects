@@ -198,3 +198,13 @@ class Group(list, Place):
         for element in self:
             element.stroke_dashoffset(stroke_dashoffset)
         return self
+    
+    def mask(self, mask):
+        for element in self:
+            element.mask(mask)
+        return self
+    
+    def filter(self, f):
+        for element in self:
+            element.filter(f)
+        return self

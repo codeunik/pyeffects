@@ -2,7 +2,6 @@ from copy import deepcopy
 import colorsys
 import numpy as np
 
-# from .defs import LinearGradient, RadialGradient
 from .place import Place
 from .transform import Transform
 from .utils import Color
@@ -178,22 +177,9 @@ class Element(Transform, Place):
         elif color.specification == 'rgb':
             return f"rgb{tuple((color.value*255).astype(int))}"
 
-    def _str_stroke(self):
-        # if isinstance(self._stroke, LinearGradient):
-        #     return f'stroke="url(#{self._stroke.id})"'
-        # elif isinstance(self._stroke, RadialGradient):
-        #     return f'stroke="url(#{self._stroke.id})"'
-        return f'stroke="{self._str_color(self._stroke)}"'
-
-    def _str_fill(self):
-        # if isinstance(self._fill, LinearGradient):
-        #     return f'fill="url(#{self._fill.id})"'
-        # elif isinstance(self._fill, RadialGradient):
-        #     return f'fill="url(#{self._fill.id})"'
-        return f'fill="{self._str_color(self._fill)}"'
 
     def _str_stroke_width(self):
-        return f'stroke-width="{self._stroke_width}"'
+        return f'stroke-width="{self._stroke_width}px"'
 
     def _str_opacity(self):
         return f'opacity="{self._opacity}"'

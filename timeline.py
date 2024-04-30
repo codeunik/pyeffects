@@ -126,7 +126,7 @@ class Timeline:
 
     def add_animation(self,
                       elements,
-                      anims,
+                      anim,
                       delay=1,
                       duration=None,
                       label=None,
@@ -141,20 +141,21 @@ class Timeline:
         self._lifetime = max(self._lifetime, end)
         ease = ease if callable(ease) else ease.rate
         print(start, end)
-        for anim in anims:
-            anim.set_elements(elements)
-            anim.set_ease(ease)
-            if isinstance(anim, Tween):
-                anim.timing(start, end, Timeline.fps)
-                for i in range(start, end+1):
-                    self._actions.setdefault(i, list())
-                    self._actions[i].append(anim)
-            else:
-                anim.set_timeline(self)
-                anim.set_fps(Timeline.fps)
-                if duration is not None:
-                    anim.set_duration(duration)
-                anim.exec(start)
+
+        anim.set_elements(elements)
+        anim.set_ease(ease)
+        if isinstance(anim, Tween):
+            anim.timing(start, end, Timeline.fps)
+            for i in range(start, end+1):
+                self._actions.setdefault(i, list())
+                self._actions[i].append(anim)
+        else:
+            anim.set_timeline(self)
+            anim.set_fps(Timeline.fps)
+            if duration is not None:
+                anim.set_duration(duration)
+            anim.exec(start)
+
         return self
 
     def stagger(self,

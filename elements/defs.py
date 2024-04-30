@@ -1,5 +1,7 @@
 from .utils import Color
 from .group import Group
+from .element import Element
+from .utils import FrameConfig 
 
 class Def:
     pass
@@ -10,11 +12,13 @@ class FilterEffect(Def):
     _component_count = 0
     _result_count = 0
 
-    def __init__(self):
+    def __init__(self, x=0, y=0, width=FrameConfig.width, height=FrameConfig.height):
         self.id = f"f{FilterEffect._fe_count}"
         FilterEffect._fe_count += 1
         # x, y, width, height, filterUnits="userSpaceOnUse"
         self.filter_effect_info = dict()
+
+        self.x, self.y, self.width, self.height = x, y, width, height
 
     def gaussian_blur(self, stdDeviation=None, result=None, component_id=None):
         params = locals()
@@ -30,6 +34,18 @@ class FilterEffect(Def):
         params = locals()
         params["name"] = "feOffset"
         params["in"] = params.pop("source")
+        return self._handler(params)
+    
+    def turbulence(self, baseFrequency=None, numOctaves=None, seed=None, stitchTiles=None, type=None, result=None, component_id=None):
+        params = locals()
+        params["name"] = "feTurbulence"
+        return self._handler(params)
+
+    def displacement_map(self, source1=None, source2=None, scale=None, xChannelSelector=None, yChannelSelector=None):
+        params = locals()
+        params["name"] = "feDisplacementMap"
+        params['in'] = params.pop("source1")
+        params['in2'] = params.pop('source2')
         return self._handler(params)
 
     def composite(self, source1=None, source2=None, result=None, operator=None, k1=None, k2=None, k3=None, k4=None, component_id=None):
@@ -70,25 +86,18 @@ class FilterEffect(Def):
 
     def _handler(self, info):
         info.pop("self")
-        component_id = info.pop("component_id")
-        if not component_id:
+        self.component_id = info.pop("component_id", None)
+        if not self.component_id:
             self.component_id = f"c{FilterEffect._component_count}"
             FilterEffect._component_count += 1
 
-            desc = dict()
-            for k, v in info.items():
-                desc[k.replace("_","-")] = v
-
-            self.filter_effect_info[self.component_id] = desc
-
-            return self.component_id
-        else:
-            for k, v in info.items():
-                if v is not None:
-                    self.filter_effect_info[component_id][k.replace("_", "-")] = str(v)
+        self.filter_effect_info.setdefault(self.component_id, dict())
+        for k, v in info.items():
+            if v is not None:
+                self.filter_effect_info[self.component_id][k.replace("_", "-")] = str(v)
 
     def _str_def(self):
-        s = f'<filter id="{self.id}">'
+        s = f'<filter id="{self.id}" filterUnits="userSpaceOnUse" x="0" y="0" width="{self.width}" height="{self.height}">'
         for component in self.filter_effect_info.values():
             s += f'<{component["name"]} '
             for k, v in component.items():
@@ -122,7 +131,7 @@ class LinearGradient(Def):
 
     def add_gradient(self, offset, stop_color, opacity=None):
         if isinstance(stop_color, list) or isinstance(stop_color, tuple):
-            stop_color = Color.rgb255(stop_color)
+            stop_color = Element._str_color(stop_color)
         self.gradients.append([offset, stop_color, opacity])
         return self
 
@@ -131,7 +140,7 @@ class LinearGradient(Def):
         s += f' gradientUnits="{self.gradient_units}"' if self.gradient_units else ""
         s += ">"
         for gradient in self.gradients:
-            s += f'<stop offset="{gradient[0]*100}%" stop-color="{Color.to_hex(gradient[1])}"'
+            s += f'<stop offset="{gradient[0]*100}%" stop-color="{gradient[1]}"'
             s += f' stop-opacity="{gradient[2]}"' if gradient[2] else ""
             s += '/>'
         s += "</linearGradient>"

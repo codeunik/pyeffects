@@ -6,79 +6,97 @@ import os
 # from wand.image import Image
 # import cairosvg
 from .elements.place import Place
-from pyeffects import g, Frame, FrameConfig
+from pyeffects import g, Frame
+import tempfile
+import pandas as pd
+import time
 
 import cv2
 import numpy as np
 import tqdm
-import json
-
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
-from multiprocessing import Queue, cpu_count
 
 class Renderer:
     count = -1
 
-    def __init__(self, timeline, frame_size=(1920, 1080), clearall=False, create_png=True):
+    def __init__(self, timeline, preview=True, clearall=False):
         self.timeline = timeline
+        self.width = 640 if preview else 1920
+        self.height = 360 if preview else 1080
+        self.preview = preview
         self.ffmpeg_bin = "/usr/bin/ffmpeg"
-        self.frame_size = frame_size
-        self.n_drivers = cpu_count()
-        self.create_png = create_png
-        if self.create_png:
-            chrome_options = webdriver.ChromeOptions()
-            chrome_options.add_argument("--headless=new")
-            service = Service(executable_path= r"/home/partha/chromedriver")
-            self.drivers = []
-            for _ in range(self.n_drivers):
-                self.drivers.append(webdriver.Chrome(service=service, options=chrome_options))
-                self.drivers[-1].set_window_size(5000, 5000)
-                self.send(self.drivers[-1], "Emulation.setDefaultBackgroundColorOverride", {'color': {'r': 0, 'g': 0, 'b': 0, 'a': 0}})
-
         Renderer.count += 1
         os.system("mkdir -p videos && mkdir -p svgs && mkdir -p pngs")
         if clearall:
             os.system("rm -rf videos/* && rm -rf svgs/* && rm -rf pngs/*")
         os.system(f"mkdir -p svgs/{Renderer.count} && mkdir -p pngs/{Renderer.count}")
 
-    def render_video(self, save_frames={-1: True}):
+    def render_video(
+        self, filename="mov", video=False, save_frames={-1: True}, png=1, svg=0
+    ):
+        if video:
+            video_writer = cv2.VideoWriter(f"videos/{filename}_{Renderer.count}.avi",cv2.VideoWriter_fourcc(*'DIVX'), self.timeline.fps, (self.width, self.height))
+            procs = []
+            n_procs = 100
+            manager = mp.Manager()
+            rendered_pngs = manager.dict()
 
         frame_number = 0
-        threads = [None for _ in range(self.n_drivers)]
-        frame_queue = Queue()
-
         while frame_number <= self.timeline._lifetime:
             print(
                 f"creating frame: {frame_number} | completed: {(frame_number / self.timeline._lifetime) * 100:.2f}%",
                 end="\r",
             )
-            frame = Frame(*self.frame_size)
+            frame = Frame(self.width, self.height)
             self.timeline.exec(frame_number)
 
-            # for k, v in (
-            #     pd.json_normalize(g, sep=".").to_dict(orient="records")[0].items()
-            # ):
-            for k, v in g.items():
-                if k not in g._blacklisted:
-                    if issubclass(type(v), Place):
-                        frame.add(v)
+            for k, v in (
+                pd.json_normalize(g, sep=".").to_dict(orient="records")[0].items()
+            ):
+                if issubclass(type(v), Place):
+                    frame.add(v)
 
             svg_data = frame.generate().encode()
-            
-            finished = frame_number == self.timeline._lifetime
-            if threads[frame_number%self.n_drivers] is None:
-                frame_queue.put([frame, frame_number, save_frames, finished])
-                p = threading.Thread(
-                    target=self.save_svg, args=(frame_queue, frame_number%self.n_drivers)
+            if video:
+                p = mp.Process(
+                    target=self.parallel_videopng, args=(svg_data, rendered_pngs)
                 )
-                threads[frame_number%self.n_drivers] = p
+                procs.append(p)
                 p.start()
-            else:
-                frame_queue.put([frame, frame_number, save_frames, finished])
-            
-            
+                time.sleep(0.001)
+
+                if (len(procs) == n_procs) or ((frame_number == self.timeline._lifetime) and (self.timeline._lifetime % n_procs)):
+                    for p in tqdm.tqdm(procs):
+                        p.join()
+                    
+                    for _, png_data in sorted(rendered_pngs.items(), key=lambda x: x[0]):
+                        png_data = cv2.imdecode(np.frombuffer(png_data, dtype=np.uint8), cv2.IMREAD_COLOR)
+                        video_writer.write(png_data)
+                    
+                    procs.clear()
+                    rendered_pngs.clear()
+
+            elif png:
+                p = mp.Process(
+                    target=self.parallel_svg2png, args=(svg_data, frame_number)
+                )
+                p.start()
+
+            # with io.StringIO() as svg_file:
+            #     svg_file.write(frame.generate())
+            # with tempfile.NamedTemporaryFile() as tmp_svg_file:
+            #     tmp_svg_file.write(frame.generate().encode())
+            # with Image(blob=frame.generate().encode()) as img:
+            #     img.format = 'png'
+            #     img.save(pipe.stdin)
+            # pipe.stdin.write(frame.generate().encode())
+
+            # cairosvg.svg2png(frame.generate(), unsafe=True, write_to=pipe.stdin)
+
+            if svg:
+                p = threading.Thread(
+                    target=self.save_svg, args=(frame, frame_number, save_frames)
+                )
+                p.start()
 
             for element in frame.elements.values():
                 element.dynamic_reset()
@@ -89,45 +107,43 @@ class Renderer:
                     pass
 
             frame_number += 1
-        
-        for c, th in enumerate(threads):
-            th.join()
 
-        frame_queue.get()
-        
+        if video:
+            video_writer.release()
 
-    def save_svg(self, frame_queue, driver_idx):
-        while True:
-            frame, frame_number, save_frames, finished = frame_queue.get()
-            
-            if finished:
-                frame_queue.put([frame, frame_number, save_frames, finished])
-                if self.create_png:
-                    driver = self.drivers[driver_idx]
-                    self.send(driver, "Emulation.setDefaultBackgroundColorOverride")
-                    driver.quit()
-                break
-            if save_frames.get(-1):
-                svg_path = f"svgs/{Renderer.count}/{str(frame_number).zfill(8)}.svg"
-            elif save_frames.get(frame_number, False):
-                svg_path = f"svgs/{Renderer.count}/{frame_number}.svg"
-            
-            frame.save(svg_path)
-            svg_abs_path = os.path.abspath(svg_path)
+    def parallel_videopng(self, svg_data, render_pngs):
+        start_time = time.time()
+        convert_svg_2_png = sp.Popen(
+            ["inkscape", "-p", "--export-type=png"],
+            stdin=sp.PIPE,
+            stdout=sp.PIPE,
+            stderr=sp.PIPE,
+        )
+        png_data, error_message = convert_svg_2_png.communicate(input=svg_data)
+        render_pngs[start_time] = png_data
 
-            if self.create_png:
-                driver = self.drivers[driver_idx]
-                driver.get('file://' + svg_abs_path)
-                e = driver.find_element(by=By.TAG_NAME, value='svg')
-                e.screenshot(f'pngs/{Renderer.count}/{str(frame_number).zfill(8)}.png')
-                
+    def parallel_svg2png(self, svg_data, frame_number):
+        convert_svg_2_png = sp.Popen(
+            [
+                "inkscape",
+                "-p",
+                f"--export-filename=pngs/{Renderer.count}/{str(frame_number).zfill(8)}.png",
+            ],
+            stdin=sp.PIPE,
+            # stdout=sp.PIPE,
+            stderr=sp.PIPE,
+        )
 
-    def send(self, driver, cmd, params={}):
-        resource = "/session/%s/chromium/send_command_and_get_result" % driver.session_id
-        url = driver.command_executor._url + resource
-        body = json.dumps({'cmd':cmd, 'params': params})
-        response = driver.command_executor._request('POST', url, body)
-        return response.get('value')
+        _ = convert_svg_2_png.communicate(input=svg_data)
+
+        # with open(f'pngs/{Renderer.count}/{str(frame_number).zfill(8)}.png', 'wb') as f:
+        #     f.write(png_data)
+
+    def save_svg(self, frame, frame_number, save_frames):
+        if save_frames.get(-1):
+            frame.save(f"svgs/{Renderer.count}/{str(frame_number).zfill(8)}.svg")
+        elif save_frames.get(frame_number, False):
+            frame.save(f"svgs/{Renderer.count}/{frame_number}.svg")
 
 
     # def render_video(self, filename="mov", lossless=False, remove_images=False):

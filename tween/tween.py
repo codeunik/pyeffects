@@ -22,7 +22,7 @@ class Tween:
 
     def set_elements(self, elements):
         self.elements = elements
-
+        
     def set_ease(self, ease):
         self.ease = ease
 

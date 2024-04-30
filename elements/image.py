@@ -9,12 +9,12 @@ from io import BytesIO
 
 
 class Image(Element):
-    def __init__(self, x, y, width, height, img_path, preserve_aspect_ratio="xMidYMid slice"):
+    def __init__(self, img_path, x, y, width=None, height=None, preserve_aspect_ratio="xMidYMid slice"):
         self.x = x
         self.y = y
+        img = PILImage.open(os.path.abspath(img_path))
         self.width = width
         self.height = height
-        img = PILImage.open(os.path.abspath(img_path))
         img_flip = ImageOps.flip(img)
         buffered = BytesIO()
         img_flip.save(buffered, format="PNG")

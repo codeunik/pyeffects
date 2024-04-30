@@ -1,7 +1,11 @@
 import numpy as np
 
+class FrameConfig:
+    width = 1920
+    height = 1080
+
 class Color:
-    def __init__(self, hsv=None, rgb=None):
+    def __init__(self, hsv=None, rgb=None, hex=None):
         # in the range (0,0,0) - (1,1,1)
         if hsv is not None:
             self.specification = 'hsv'
@@ -9,6 +13,9 @@ class Color:
         elif rgb is not None:
             self.specification = 'rgb'
             self.value = np.array(rgb)
+        elif hex is not None:
+            self.specification = 'rgb'
+            self.value = np.array(tuple(int(hex[i:i+2], 16)  for i in (0, 2, 4)))
 
     # @staticmethod
     # def hex(color):

@@ -7,6 +7,7 @@ __license__ = "MIT"
 global g # global container, blocked elements container
 
 class G(dict):
+    _blacklisted = []
 
     def __init__(self):
         super().__init__()
@@ -22,16 +23,9 @@ class G(dict):
         #         if not hasattr(element, 'name'):
         #             self.__setitem__(uuid.uuid4().hex, element)
 
-    def asynk(self, key):
-        async def f(key):
-            return super(G, self).__getitem__(key)
-        return f(key)
+    def blacklist(self, key):
+        G._blacklisted.append(key)
 
-    def __delitem__(self, key):
-        # if isinstance(self[key], Group):
-        #     for element in self[key]:
-        #         super().__delitem__(element.name)
-        super().__delitem__(key)
 
 
 g = G()

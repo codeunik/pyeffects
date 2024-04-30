@@ -15,8 +15,8 @@ class TexConfig:
     mono_font = None
     sans_font = None
     font_size = 40
-    fill = Color(rgb=(1,1,1))
-    stroke = Color(rgb=(1,1,1))
+    fill = "#FFFFFF"
+    stroke = "#FFFFFF"
     stroke_width = 1
     page_width = 1920
     page_height = 1080
@@ -32,11 +32,12 @@ class TexConfig:
 
 def Tex(expr, justify='center'):
     backslash = '\\'
-    filename = hashlib.md5(bytes(f"{expr, str(TexConfig.__dict__)}", encoding="utf-8")).hexdigest()
-    if not os.path.exists(f"/tmp/pyeffects/text/{filename}.tex"):
-        with open(f'/tmp/pyeffects/text/{filename}.tex', 'w') as f:
-            f.write(f'''
-\\documentclass[11pt]{{article}}
+    hash = hashlib.md5(bytes(f"{expr, str(TexConfig.__dict__)}", encoding="utf-8")).hexdigest()
+    folder1 = hash[:3]
+    folder2 = hash[3:6]
+    folder3 = hash[6:]
+    if not os.path.exists(f"/tmp/pyeffects/text/{folder1}/{folder2}/{folder3}/texput.svg"):
+        s = f'''\\documentclass[11pt]{{article}}
 \\usepackage{{amsmath}}
 \\usepackage{{amssymb}}
 \\usepackage{{amsfonts}}
@@ -45,10 +46,10 @@ def Tex(expr, justify='center'):
 \\usepackage[a4paper, margin=0pt,paperheight={TexConfig.page_height}bp,paperwidth={TexConfig.page_width}bp]{{geometry}}
 \\usepackage{{fontspec}}
 \\defaultfontfeatures{{Ligatures={{NoCommon, NoDiscretionary, NoHistoric, NoRequired, NoContextual}}}}
-''' + (f"\\setmainfont{'[Path='+TexConfig.font_path+']' if TexConfig.font_path else ''}{{{TexConfig.main_font}}}" if TexConfig.main_font else "")
-    + (f"\\setmonofont{{{TexConfig.mono_font}}}" if TexConfig.mono_font else "")
-    + (f"\\setsansfont{{{TexConfig.sans_font}}}" if TexConfig.sans_font else "")
-+ f'''\\parindent=0pt
+''' + (f"\\setmainfont{'[Path='+TexConfig.font_path+']' if TexConfig.font_path else ''}{{{TexConfig.main_font}}}" if TexConfig.main_font else "") \
+    + (f"\\setmonofont{{{TexConfig.mono_font}}}" if TexConfig.mono_font else "") \
+    + (f"\\setsansfont{{{TexConfig.sans_font}}}" if TexConfig.sans_font else "") \
+    + f'''\\parindent=0pt
 \\thispagestyle{{empty}}
 \\linespread{{{TexConfig.line_spacing}}}
 
@@ -56,27 +57,30 @@ def Tex(expr, justify='center'):
 {'{}begin{{center}}'.format(backslash) if justify=='center' else ''}
 {{\\fontsize{{{TexConfig.font_size}}}{{{1.2*TexConfig.font_size}}}\selectfont {expr}}}
 {'{}end{{center}}'.format(backslash) if justify=='center' else ''}
-\\end{{document}}''')
+\\end{{document}}'''
 
-        # os.system(f"cd /tmp/pyeffects/text/ && xelatex -no-pdf {filename}.tex && dvisvgm -e -n {filename}.xdv")
-        os.system(f"cd /tmp/pyeffects/text/ && xelatex -no-pdf {filename}.tex > /dev/null 2>&1 && dvisvgm -e -n {filename}.xdv > /dev/null 2>&1")
+        os.system(f'''mkdir -p /tmp/pyeffects/text/{folder1}/{folder2}/{folder3} && cd /tmp/pyeffects/text/{folder1}/{folder2}/{folder3} && xelatex -interaction=nonstopmode -halt-on-error -no-pdf $(cat << 'EOF'
+{s}
+EOF
+) > /dev/null 2>&1 && dvisvgm -e -n texput.xdv > /dev/null 2>&1''')
     
-    with open(f'/tmp/pyeffects/text/{filename}.svg', 'r') as f:
+    with open(f'/tmp/pyeffects/text/{folder1}/{folder2}/{folder3}/texput.svg', 'r') as f:
         soup = bs4.BeautifulSoup(f, 'xml')
 
     uses = soup.find_all('use')
     rects = soup.find_all('rect')
 
     chars = Group()
-    fx = float(uses[0].attrs['x'])
-    fy = float(uses[0].attrs['y'])
-    for use in uses:
-        path = soup.find(id=use.attrs['xlink:href'][1:]).attrs['d']
-        x = float(use.attrs['x']) - fx
-        y = float(use.attrs['y']) - fy
-        path = Path(path)
-        path.matrix(np.array([[1, 0, 0, x], [0, -1, 0, -y], [0, 0, 1, 0], [0, 0, 0, 1.0]]))
-        chars.add(path)
+    if uses:
+        fx = float(uses[0].attrs['x'])
+        fy = float(uses[0].attrs['y'])
+        for use in uses:
+            path = soup.find(id=use.attrs['xlink:href'][1:]).attrs['d']
+            x = float(use.attrs['x']) - fx
+            y = float(use.attrs['y']) - fy
+            path = Path(path)
+            path.matrix(np.array([[1, 0, 0, x], [0, -1, 0, -y], [0, 0, 1, 0], [0, 0, 0, 1.0]]))
+            chars.add(path)
     for rect in rects:
         x = float(rect.attrs['x']) - fx
         y = float(rect.attrs['y']) - fy
@@ -88,4 +92,8 @@ def Tex(expr, justify='center'):
 
     chars.fill(TexConfig.fill).stroke(TexConfig.stroke).stroke_width(TexConfig.stroke_width)
     # chars.scale(TexConfig.scale_factor, TexConfig.scale_factor)
-    return chars
+    if len(chars):
+        return chars
+    else:
+        chars.add(Path("M0,0"))
+        return chars
